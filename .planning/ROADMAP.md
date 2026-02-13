@@ -19,8 +19,8 @@
 
 ## Reflection Quality
 
-- [ ] **Include tool call ordering in reflection data** — Update `get_tools_since_breakpoint` and `get_all_since_breakpoint` to return sequenced, interleaved turn data so `/reflect` can analyze reasoning flow
-- [ ] **Cross-session reflection** — Allow `/reflect` to compare across multiple breakpoint windows, not just the current one, for methodology evolution analysis
+- [x] **Include tool call ordering in reflection data** — get_all_since_breakpoint now includes turn_blocks; reflect.md pulls get_turn_blocks for reasoning flow analysis
+- [x] **Cross-session reflection** — get_reflections_summary added; reflect.md pulls previous reflections and includes Methodology Evolution section
 
 ## Housekeeping
 

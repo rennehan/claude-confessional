@@ -300,6 +300,9 @@ def cmd_get_all_since_breakpoint(project):
         (project, current_bp["id"])
     ).fetchall()
 
+    # Also fetch turn blocks for the current window
+    turn_blocks = cmd_get_turn_blocks(project)
+
     result = {
         "breakpoint": current_bp,
         "interactions": [
@@ -311,7 +314,8 @@ def cmd_get_all_since_breakpoint(project):
             }
             for p in prompts
         ],
-        "count": len(prompts)
+        "count": len(prompts),
+        "turn_blocks": turn_blocks,
     }
     print(json.dumps(result, indent=2))
     conn.close()
@@ -537,6 +541,26 @@ def cmd_get_turn_blocks(project):
     return list(turns.values())
 
 
+def cmd_get_turn_blocks_print(project):
+    """Print ordered turn blocks as JSON (CLI command variant)."""
+    result = cmd_get_turn_blocks(project)
+    print(json.dumps(result, indent=2))
+
+
+def cmd_get_reflections_summary(project):
+    """Get all reflections for a project with metadata. Returns a list of dicts."""
+    init_db()
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT id, project, breakpoint_start_id, breakpoint_end_id,
+                  timestamp, reflection, git_summary, prompt_count
+           FROM reflections WHERE project = ? ORDER BY id ASC""",
+        (project,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def cmd_get_tools_since_breakpoint(project):
     """Get all tool usage since the last breakpoint."""
     init_db()
@@ -629,8 +653,9 @@ if __name__ == "__main__":
         print("Commands: init, record_prompt, record_response, breakpoint, get_window,")
         print("          get_all_since_breakpoint, store_reflection, get_reflections, stats,")
         print("          record_session_context, record_tool, get_tools_since_breakpoint,")
-        print("          get_session_context, record_interaction,")
-        print("          enable_recording, disable_recording, is_recording")
+        print("          get_session_context, record_interaction, get_turn_blocks,")
+        print("          get_reflections_summary, enable_recording, disable_recording,")
+        print("          is_recording")
         print()
         print("Use --stdin to read the primary text payload from stdin instead of argv.")
         print("This avoids shell escaping issues with quotes, newlines, and special characters.")
@@ -724,6 +749,11 @@ if __name__ == "__main__":
         cmd_get_tools_since_breakpoint(project)
     elif command == "get_session_context":
         cmd_get_session_context(project)
+    elif command == "get_turn_blocks":
+        cmd_get_turn_blocks_print(project)
+    elif command == "get_reflections_summary":
+        result = cmd_get_reflections_summary(project)
+        print(json.dumps(result, indent=2))
     elif command == "enable_recording":
         cmd_enable_recording(project)
     elif command == "disable_recording":

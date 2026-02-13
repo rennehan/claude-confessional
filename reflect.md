@@ -25,9 +25,19 @@ Pull tool usage data:
 python3 ~/.claude/scripts/reflection_db.py get_tools_since_breakpoint "<project>"
 ```
 
+Pull ordered turn blocks (the reasoning narrative — text/tool interleaving):
+```bash
+python3 ~/.claude/scripts/reflection_db.py get_turn_blocks "<project>"
+```
+
 Pull session context:
 ```bash
 python3 ~/.claude/scripts/reflection_db.py get_session_context "<project>"
+```
+
+Pull previous reflections for cross-session comparison:
+```bash
+python3 ~/.claude/scripts/reflection_db.py get_reflections_summary "<project>"
 ```
 
 Pull git history since the last breakpoint timestamp (if in a git repo):
@@ -80,6 +90,12 @@ Study the prompts and responses together. Extract:
 - What files were touched most frequently? Where was the focus?
 - Tool density per prompt — some prompts trigger 10 tool calls, others zero. What does that say about the prompt?
 
+**Reasoning Flow** (from turn blocks) — How does Claude's reasoning unfold?
+- **Reasoning depth** — Average tool calls per turn. High = deep exploration. Low = quick exchanges.
+- **Interleave pattern** — Does Claude explain before acting or act before explaining?
+- **Silent work ratio** — Turns with many tool calls but little text = autonomous work. Turns with much text and few tools = discussion mode.
+- What is the typical block sequence? (text → tool → text? Or tool → tool → tool → text?)
+
 **Session Context** — What was the environment?
 - What model was used? Any MCP tools available?
 - Did the CLAUDE.md change during the session?
@@ -111,9 +127,10 @@ Check if there are previous reflections:
 python3 ~/.claude/scripts/reflection_db.py get_reflections "<project>"
 ```
 
-If previous reflections exist, also note:
-- How the methodology is evolving over time
-- Whether patterns are becoming more refined or shifting
+If previous reflections exist, also include a **Methodology Evolution** section:
+- How has the user's approach changed since earlier reflections?
+- Are patterns becoming more refined or shifting direction?
 - Any emerging meta-patterns across sessions
+- What has the user learned about their own working style?
 
 Present the full reflection to the user.
