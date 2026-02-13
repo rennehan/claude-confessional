@@ -39,6 +39,7 @@ def init_db():
             breakpoint_id INTEGER,
             timestamp TEXT NOT NULL,
             prompt TEXT NOT NULL,
+            transcript_offset INTEGER,
             FOREIGN KEY (breakpoint_id) REFERENCES breakpoints(id)
         );
 
@@ -430,10 +431,21 @@ def cmd_record_interaction(project, json_text):
     bp_id = bp["id"] if bp else None
     ts = now_iso()
 
+    # Check for duplicate via transcript_offset
+    t_offset = data.get("transcript_offset")
+    if t_offset is not None:
+        dup = conn.execute(
+            "SELECT 1 FROM prompts WHERE project = ? AND transcript_offset = ?",
+            (project, t_offset)
+        ).fetchone()
+        if dup:
+            conn.close()
+            return
+
     # 1. Insert prompt
     cursor = conn.execute(
-        "INSERT INTO prompts (project, breakpoint_id, timestamp, prompt) VALUES (?, ?, ?, ?)",
-        (project, bp_id, ts, data.get("prompt", ""))
+        "INSERT INTO prompts (project, breakpoint_id, timestamp, prompt, transcript_offset) VALUES (?, ?, ?, ?, ?)",
+        (project, bp_id, ts, data.get("prompt", ""), t_offset)
     )
     prompt_id = cursor.lastrowid
 

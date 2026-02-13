@@ -172,6 +172,7 @@ def parse_last_turn(transcript_path):
     if last_user_idx is None:
         return None
 
+    transcript_offset = last_user_idx
     prompt_text = _extract_user_prompt_text(lines[last_user_idx])
 
     # Collect all content blocks after the user prompt.
@@ -255,6 +256,7 @@ def parse_last_turn(transcript_path):
         "response": response,
         "tools": tools,
         "blocks": blocks,
+        "transcript_offset": transcript_offset,
     }
 
 

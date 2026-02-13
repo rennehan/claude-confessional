@@ -5,7 +5,7 @@
 - [x] **Harden `parse_last_turn` for structured user content** — Handle multi-part user messages (images, skill expansions, system injections) instead of returning empty string for non-string content
 - [x] **Capture full response narrative with tool call ordering** — turn_blocks table preserves interleaved text/tool_use/tool_result sequence per turn
 - [x] **Fix empty response recording** — Turns where Claude only makes tool calls (no text blocks) now record a synthetic summary like `[tool-only turn: Read, Edit]`
-- [ ] **Add deduplication** — Prevent the same turn from being recorded twice across sessions or hook re-fires (e.g. track transcript offset or prompt hash)
+- [x] **Add deduplication** — transcript_offset tracked per prompt; duplicate offsets skipped in record_interaction
 
 ## Error Handling & Observability
 
