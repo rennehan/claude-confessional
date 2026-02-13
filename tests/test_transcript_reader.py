@@ -905,6 +905,40 @@ class TestComputePromptLinguistics:
         result = compute_prompt_linguistics(turns)
         assert result["prompt_length"]["count"] == 1  # only "Fix the bug"
 
+    def test_skill_expansions_excluded(self):
+        """Skill expansion prompts (e.g. /reflect, /sermon) should be filtered out."""
+        from transcript_reader import compute_prompt_linguistics
+        skill_prompt = "# Reflect\n\n" + "Analyze the user's methodology. " * 50
+        turns = [
+            _turn("Let's think about the dashboard"),
+            _turn(skill_prompt),  # skill expansion — should be excluded
+            _turn("push it"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["prompt_length"]["count"] == 2  # only organic prompts
+        # Skill expansion text shouldn't pollute n-grams
+        bigram_phrases = [b["ngram"] for b in result["frequent_ngrams"]["bigrams"]]
+        assert "the user's" not in bigram_phrases
+
+    def test_short_markdown_header_not_excluded(self):
+        """Short prompts starting with # should NOT be excluded."""
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("# Fix this heading")]
+        result = compute_prompt_linguistics(turns)
+        assert result["prompt_length"]["count"] == 1
+
+    def test_skill_expansion_detection(self):
+        """Test _is_skill_expansion directly."""
+        from transcript_reader import _is_skill_expansion
+        # Skill expansion: starts with H1, 100+ words
+        assert _is_skill_expansion("# Reflect\n\n" + "word " * 100)
+        assert _is_skill_expansion("# Sermon\n\n" + "word " * 150)
+        # NOT skill expansions
+        assert not _is_skill_expansion("# Fix this heading")
+        assert not _is_skill_expansion("Let's think about this")
+        assert not _is_skill_expansion("")
+        assert not _is_skill_expansion("   ")
+
 
 # --- Tests: CLI ---
 
@@ -1147,6 +1181,19 @@ class TestComputeEffectivenessSignals:
         sp = result["session_progression"]
         assert sp["first_half_correction_rate"] == sp["second_half_correction_rate"]
         assert sp["warming_up"] is False  # equal is not warming up
+
+    def test_skill_expansions_excluded(self):
+        """Skill expansion turns should be filtered from effectiveness analysis."""
+        from transcript_reader import compute_effectiveness_signals
+        skill_prompt = "# Reflect\n\n" + "Analyze the methodology. " * 50
+        turns = [
+            _turn("Fix the bug"),
+            _turn("Add some tests"),
+            _turn(skill_prompt),  # skill expansion — should be excluded
+        ]
+        result = compute_effectiveness_signals(turns)
+        # Only 1 eligible pair (turns 0→1), the skill expansion is filtered out
+        assert result["eligible_turns"] == 1
 
 
 class TestCLI:

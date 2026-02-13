@@ -293,6 +293,23 @@ class TestGenerateSessionHtml:
         assert "25" in html  # tool calls
         assert "85" in html  # first-response acceptance (85%)
 
+    def test_cache_hit_uses_correct_denominator(self, breakpoint_data,
+                                                 reflection_meta):
+        """Cache hit should be cache_read / (input + cache_read + cache_creation)."""
+        data = _make_analysis_data()
+        data["token_stats"] = {
+            "total_input": 10000,
+            "total_output": 1000,
+            "total_cache_read": 9000000,
+            "total_cache_creation": 400000,
+        }
+        html = dashboard.generate_session_html(
+            data, breakpoint_data, reflection_meta, "test-project")
+        # Correct: 9000000 / (10000 + 9000000 + 400000) = 95.6% -> rounds to 96%
+        # Bug would give: 9000000 / 10000 * 100 = 90000%
+        assert "90000%" not in html
+        assert "96%" in html
+
 
 # --- Tests: Index dashboard ---
 

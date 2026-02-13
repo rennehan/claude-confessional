@@ -280,7 +280,9 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
     total_input = token_stats.get("total_input", 0)
     total_output = token_stats.get("total_output", 0)
     cache_read = token_stats.get("total_cache_read", 0)
-    cache_hit = round(cache_read / total_input * 100) if total_input > 0 else 0
+    cache_creation = token_stats.get("total_cache_creation", 0)
+    total_all_input = total_input + cache_read + cache_creation
+    cache_hit = round(cache_read / total_all_input * 100) if total_all_input > 0 else 0
 
     bp_ts = breakpoint.get("timestamp", "")
     bp_note = breakpoint.get("note", "")

@@ -57,6 +57,11 @@ CORRECTION_MARKERS = [
     "try again", "let me rephrase",
 ]
 
+# Skill expansion detection — these are system-generated prompts, not user input.
+# Skill expansions start with "# <Name>\n" and contain structured instructions.
+SKILL_EXPANSION_PATTERN = re.compile(r"^#\s+\w+\s*\n")
+SKILL_EXPANSION_MIN_WORDS = 100
+
 ASSERTIVE_PHRASES = [
     "must", "always", "definitely", "need to", "should", "have to",
     "make sure", "ensure",
@@ -486,6 +491,22 @@ def _count_phrase_occurrences(text, phrases):
     return {phrase: lower.count(phrase) for phrase in phrases}
 
 
+def _is_skill_expansion(prompt):
+    """Detect if a prompt is a skill expansion rather than organic user input.
+
+    Skill expansions are system-generated instructions injected when the user
+    invokes a slash command (e.g. /reflect, /sermon). They start with a
+    markdown H1 header and contain 100+ words of structured instructions.
+    We exclude these from linguistic analysis because they don't represent
+    the user's actual prompting voice.
+    """
+    if not prompt.strip():
+        return False
+    if SKILL_EXPANSION_PATTERN.match(prompt) and _word_count(prompt) >= SKILL_EXPANSION_MIN_WORDS:
+        return True
+    return False
+
+
 def compute_prompt_linguistics(turns):
     """Compute quantitative linguistic features across user prompts.
 
@@ -497,8 +518,9 @@ def compute_prompt_linguistics(turns):
         frequent_ngrams, certainty_markers, agency_framing,
         prompt_length_by_position.
     """
-    # Filter to non-empty prompts
-    prompts = [t["prompt"] for t in turns if t["prompt"].strip()]
+    # Filter to non-empty organic prompts (exclude skill expansions)
+    prompts = [t["prompt"] for t in turns
+               if t["prompt"].strip() and not _is_skill_expansion(t["prompt"])]
 
     # Empty result structure
     empty = {
@@ -682,6 +704,9 @@ def compute_effectiveness_signals(turns):
             "warming_up": False,
         },
     }
+
+    # Filter out skill expansion turns before analysis
+    turns = [t for t in turns if not _is_skill_expansion(t.get("prompt", ""))]
 
     if len(turns) < 2:
         return empty
