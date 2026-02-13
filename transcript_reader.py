@@ -9,9 +9,53 @@ No data duplication — reads the source of truth on-demand.
 """
 
 import json
+import re
+import statistics
+import string
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+
+# --- Constants for linguistic analysis ---
+
+STOP_WORDS = frozenset({
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "is", "it", "this", "that", "are", "was",
+    "be", "have", "has", "had", "do", "does", "did", "will", "would",
+    "could", "should", "may", "might", "can", "shall", "not", "no", "so",
+    "if", "then", "than", "too", "very", "just", "about", "up", "out",
+    "all", "also", "as", "into", "like", "through", "after", "before",
+    "between", "each", "more", "some", "such", "only", "other", "new",
+    "when", "what", "which", "where", "who", "how", "i", "me", "my",
+    "we", "our", "you", "your", "he", "she", "they", "them", "its",
+    "been", "being", "am", "were", "here", "there",
+})
+
+IMPERATIVE_VERBS = frozenset({
+    "fix", "add", "make", "create", "update", "change", "remove", "delete",
+    "write", "read", "show", "run", "build", "implement", "move", "rename",
+    "refactor", "test", "check", "find", "search", "look", "use", "try",
+    "set", "get", "put", "install", "deploy", "push", "pull", "merge",
+    "revert", "undo", "do", "go", "stop", "start", "open", "close",
+    "list", "print", "log", "debug", "explain", "describe", "summarize",
+    "analyze", "compare", "review", "clean", "format", "sort", "filter",
+    "group", "split", "join", "combine", "convert", "extract", "parse",
+    "validate", "verify", "ensure", "handle", "catch", "throw", "raise",
+    "return", "pass", "call", "invoke", "apply", "map", "reduce", "wrap",
+    "unwrap", "flatten", "copy", "clone", "extend", "import", "export",
+    "require", "include", "load", "save", "store", "fetch", "send",
+    "post", "patch",
+})
+
+HEDGING_PHRASES = [
+    "maybe", "perhaps", "i think", "not sure", "what if", "could we", "might",
+]
+
+ASSERTIVE_PHRASES = [
+    "must", "always", "definitely", "need to", "should", "have to",
+    "make sure", "ensure",
+]
 
 
 def get_transcript_dir(cwd: str) -> Path:
@@ -394,6 +438,181 @@ def get_turns_since(cwd: str, since_timestamp: str, transcript_dir=None) -> dict
             "total_cache_creation": total_cache_creation,
         },
         "sessions": session_summaries,
+    }
+
+
+# --- Linguistic Analysis ---
+
+def _word_count(text):
+    """Count words in a string."""
+    return len(text.split())
+
+
+def _strip_punctuation(word):
+    """Strip leading/trailing punctuation from a word."""
+    return word.strip(string.punctuation)
+
+
+def _extract_ngrams(text, n):
+    """Extract n-grams from text, filtering stop-word-only n-grams.
+
+    Returns dict of {ngram_string: count}.
+    """
+    words = [_strip_punctuation(w) for w in text.lower().split()]
+    words = [w for w in words if w]  # remove empty after stripping
+    counts = {}
+    for i in range(len(words) - n + 1):
+        gram = words[i:i + n]
+        if all(w in STOP_WORDS for w in gram):
+            continue
+        key = " ".join(gram)
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _count_phrase_occurrences(text, phrases):
+    """Count occurrences of each phrase in text (case-insensitive).
+
+    Returns dict of {phrase: count}.
+    """
+    lower = text.lower()
+    return {phrase: lower.count(phrase) for phrase in phrases}
+
+
+def compute_prompt_linguistics(turns):
+    """Compute quantitative linguistic features across user prompts.
+
+    Args:
+        turns: List of turn dicts (from parse_session or get_turns_since).
+
+    Returns:
+        Dict with question_ratio, imperative_ratio, prompt_length,
+        frequent_ngrams, certainty_markers, agency_framing,
+        prompt_length_by_position.
+    """
+    # Filter to non-empty prompts
+    prompts = [t["prompt"] for t in turns if t["prompt"].strip()]
+
+    # Empty result structure
+    empty = {
+        "question_ratio": 0.0,
+        "imperative_ratio": 0.0,
+        "prompt_length": {
+            "median": 0.0, "mean": 0.0, "min": 0, "max": 0,
+            "stddev": 0.0, "count": 0,
+        },
+        "frequent_ngrams": {"bigrams": [], "trigrams": []},
+        "certainty_markers": {
+            "hedging_count": 0, "assertive_count": 0, "ratio": None,
+            "hedging_phrases": {p: 0 for p in HEDGING_PHRASES},
+            "assertive_phrases": {p: 0 for p in ASSERTIVE_PHRASES},
+        },
+        "agency_framing": {
+            "i_count": 0, "we_count": 0, "you_count": 0, "lets_count": 0,
+            "dominant": "none",
+        },
+        "prompt_length_by_position": {
+            "first_quarter_avg": 0.0, "middle_half_avg": 0.0,
+            "last_quarter_avg": 0.0,
+        },
+    }
+
+    if not prompts:
+        return empty
+
+    count = len(prompts)
+
+    # Question ratio
+    questions = sum(1 for p in prompts if "?" in p)
+    question_ratio = questions / count
+
+    # Imperative ratio
+    imperatives = sum(
+        1 for p in prompts
+        if p.split()[0].lower().strip(string.punctuation) in IMPERATIVE_VERBS
+    )
+    imperative_ratio = imperatives / count
+
+    # Prompt length distribution
+    word_counts = [_word_count(p) for p in prompts]
+    median_wc = statistics.median(word_counts)
+    mean_wc = statistics.mean(word_counts)
+    stddev_wc = statistics.stdev(word_counts) if len(word_counts) >= 2 else 0.0
+
+    # Frequent n-grams (aggregate across all prompts)
+    bigram_counts = {}
+    trigram_counts = {}
+    for p in prompts:
+        for gram, c in _extract_ngrams(p, 2).items():
+            bigram_counts[gram] = bigram_counts.get(gram, 0) + c
+        for gram, c in _extract_ngrams(p, 3).items():
+            trigram_counts[gram] = trigram_counts.get(gram, 0) + c
+
+    top_bigrams = sorted(bigram_counts.items(), key=lambda x: x[1], reverse=True)[:15]
+    top_trigrams = sorted(trigram_counts.items(), key=lambda x: x[1], reverse=True)[:15]
+
+    # Certainty markers
+    hedging_totals = {p: 0 for p in HEDGING_PHRASES}
+    assertive_totals = {p: 0 for p in ASSERTIVE_PHRASES}
+    for prompt in prompts:
+        for phrase, c in _count_phrase_occurrences(prompt, HEDGING_PHRASES).items():
+            hedging_totals[phrase] += c
+        for phrase, c in _count_phrase_occurrences(prompt, ASSERTIVE_PHRASES).items():
+            assertive_totals[phrase] += c
+    hedging_count = sum(hedging_totals.values())
+    assertive_count = sum(assertive_totals.values())
+    certainty_ratio = (assertive_count / hedging_count) if hedging_count > 0 else None
+
+    # Agency framing
+    i_count = sum(len(re.findall(r"\bi (want|need|think)\b", p.lower())) for p in prompts)
+    we_count = sum(len(re.findall(r"\bwe (should|could|need)\b", p.lower())) for p in prompts)
+    you_count = sum(len(re.findall(r"\byou (should|can|need)\b", p.lower())) for p in prompts)
+    lets_count = sum(len(re.findall(r"\blet'?s\b", p.lower())) for p in prompts)
+    agency = {"i": i_count, "we": we_count, "you": you_count, "lets": lets_count}
+    max_agency = max(agency.values())
+    dominant = "none" if max_agency == 0 else max(agency, key=agency.get)
+
+    # Prompt length by position
+    q1_end = max(1, count // 4)
+    q3_start = count - max(1, count // 4)
+    first_quarter = word_counts[:q1_end]
+    middle_half = word_counts[q1_end:q3_start] if q1_end < q3_start else word_counts
+    last_quarter = word_counts[q3_start:]
+
+    return {
+        "question_ratio": question_ratio,
+        "imperative_ratio": imperative_ratio,
+        "prompt_length": {
+            "median": median_wc,
+            "mean": mean_wc,
+            "min": min(word_counts),
+            "max": max(word_counts),
+            "stddev": stddev_wc,
+            "count": count,
+        },
+        "frequent_ngrams": {
+            "bigrams": [{"ngram": g, "count": c} for g, c in top_bigrams],
+            "trigrams": [{"ngram": g, "count": c} for g, c in top_trigrams],
+        },
+        "certainty_markers": {
+            "hedging_count": hedging_count,
+            "assertive_count": assertive_count,
+            "ratio": certainty_ratio,
+            "hedging_phrases": hedging_totals,
+            "assertive_phrases": assertive_totals,
+        },
+        "agency_framing": {
+            "i_count": i_count,
+            "we_count": we_count,
+            "you_count": you_count,
+            "lets_count": lets_count,
+            "dominant": dominant,
+        },
+        "prompt_length_by_position": {
+            "first_quarter_avg": statistics.mean(first_quarter),
+            "middle_half_avg": statistics.mean(middle_half),
+            "last_quarter_avg": statistics.mean(last_quarter),
+        },
     }
 
 

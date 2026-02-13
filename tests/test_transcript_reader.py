@@ -576,6 +576,294 @@ class TestGetTurnsSince:
         assert result["turns"] == []
 
 
+# --- Helper: turn dict builder ---
+
+def _turn(prompt, response="response", tools=None, session_id="sess-1",
+          input_tokens=100, output_tokens=50):
+    """Build a minimal turn dict for linguistics/effectiveness tests."""
+    return {
+        "prompt": prompt,
+        "response": response,
+        "tools": tools or [],
+        "blocks": [],
+        "metrics": {
+            "model": "claude-opus-4-6",
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "stop_reason": "end_turn",
+        },
+        "timestamp": _ts(),
+        "session_id": session_id,
+    }
+
+
+def _tool(name, file_path=""):
+    """Build a minimal tool dict."""
+    return {
+        "tool_name": name,
+        "input_summary": file_path or name,
+        "files_touched": file_path,
+        "is_subagent": name == "Task",
+    }
+
+
+# --- Tests: compute_prompt_linguistics ---
+
+class TestComputePromptLinguistics:
+
+    def test_empty_turns(self):
+        from transcript_reader import compute_prompt_linguistics
+        result = compute_prompt_linguistics([])
+        assert result["question_ratio"] == 0.0
+        assert result["imperative_ratio"] == 0.0
+        assert result["prompt_length"]["count"] == 0
+        assert result["frequent_ngrams"]["bigrams"] == []
+        assert result["frequent_ngrams"]["trigrams"] == []
+        assert result["certainty_markers"]["hedging_count"] == 0
+        assert result["certainty_markers"]["assertive_count"] == 0
+        assert result["agency_framing"]["dominant"] == "none"
+
+    def test_single_turn(self):
+        from transcript_reader import compute_prompt_linguistics
+        result = compute_prompt_linguistics([_turn("Fix the bug")])
+        assert result["prompt_length"]["count"] == 1
+        assert result["prompt_length"]["median"] == 3.0
+        assert result["prompt_length"]["stddev"] == 0.0
+
+    def test_question_ratio_all_questions(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("What is this?"), _turn("How does it work?"), _turn("Why?")]
+        result = compute_prompt_linguistics(turns)
+        assert result["question_ratio"] == 1.0
+
+    def test_question_ratio_none(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("Fix this"), _turn("Add that"), _turn("Done")]
+        result = compute_prompt_linguistics(turns)
+        assert result["question_ratio"] == 0.0
+
+    def test_question_ratio_mixed(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("What is this?"), _turn("Fix it"),
+                 _turn("How?"), _turn("Add tests")]
+        result = compute_prompt_linguistics(turns)
+        assert result["question_ratio"] == 0.5
+
+    def test_imperative_ratio(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("Fix the bug"), _turn("I want to understand"),
+                 _turn("Add a test"), _turn("The code is broken")]
+        result = compute_prompt_linguistics(turns)
+        assert result["imperative_ratio"] == 0.5  # fix, add
+
+    def test_imperative_ratio_case_insensitive(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("FIX this"), _turn("fix that")]
+        result = compute_prompt_linguistics(turns)
+        assert result["imperative_ratio"] == 1.0
+
+    def test_prompt_length_distribution(self):
+        from transcript_reader import compute_prompt_linguistics
+        # Word counts: 3, 5, 7, 9, 11
+        turns = [
+            _turn("one two three"),
+            _turn("one two three four five"),
+            _turn("one two three four five six seven"),
+            _turn("one two three four five six seven eight nine"),
+            _turn("one two three four five six seven eight nine ten eleven"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["prompt_length"]["median"] == 7.0
+        assert result["prompt_length"]["mean"] == 7.0
+        assert result["prompt_length"]["min"] == 3
+        assert result["prompt_length"]["max"] == 11
+        assert result["prompt_length"]["count"] == 5
+
+    def test_prompt_length_single_prompt(self):
+        from transcript_reader import compute_prompt_linguistics
+        result = compute_prompt_linguistics([_turn("one two three four five")])
+        assert result["prompt_length"]["stddev"] == 0.0
+        assert result["prompt_length"]["median"] == 5.0
+
+    def test_frequent_bigrams(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("for example this works great"),
+            _turn("for example that also works"),
+            _turn("for example another case"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        bigrams = result["frequent_ngrams"]["bigrams"]
+        assert len(bigrams) > 0
+        assert bigrams[0]["ngram"] == "for example"
+        assert bigrams[0]["count"] == 3
+
+    def test_frequent_trigrams(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("I think we should fix this"),
+            _turn("I think we should add tests"),
+            _turn("I think we need more coverage"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        trigrams = result["frequent_ngrams"]["trigrams"]
+        assert len(trigrams) > 0
+        # "i think we" should be top trigram
+        assert trigrams[0]["ngram"] == "i think we"
+        assert trigrams[0]["count"] == 3
+
+    def test_ngrams_filter_stopwords(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("the a in on at to for of with by"),
+            _turn("the a in on at to for of with by"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        # All bigrams/trigrams are pure stopwords — should be filtered out
+        for bg in result["frequent_ngrams"]["bigrams"]:
+            words = bg["ngram"].split()
+            assert not all(w in {"the", "a", "in", "on", "at", "to", "for", "of", "with", "by"} for w in words)
+
+    def test_ngrams_top_15_limit(self):
+        from transcript_reader import compute_prompt_linguistics
+        # Create 20+ distinct meaningful bigrams
+        turns = []
+        for i in range(20):
+            turns.append(_turn(f"concept{i} works well here"))
+        result = compute_prompt_linguistics(turns)
+        assert len(result["frequent_ngrams"]["bigrams"]) <= 15
+
+    def test_certainty_markers_hedging(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("Maybe we should try this"),
+            _turn("I think this could work"),
+            _turn("Not sure if this is right"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["certainty_markers"]["hedging_count"] >= 3
+        assert result["certainty_markers"]["hedging_phrases"]["maybe"] == 1
+        assert result["certainty_markers"]["hedging_phrases"]["i think"] == 1
+        assert result["certainty_markers"]["hedging_phrases"]["not sure"] == 1
+
+    def test_certainty_markers_assertive(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("You must fix this now"),
+            _turn("We need to ensure correctness"),
+            _turn("Make sure the tests pass"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["certainty_markers"]["assertive_count"] >= 3
+        assert result["certainty_markers"]["assertive_phrases"]["must"] == 1
+        assert result["certainty_markers"]["assertive_phrases"]["ensure"] == 1
+        assert result["certainty_markers"]["assertive_phrases"]["make sure"] == 1
+
+    def test_certainty_markers_ratio(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("Maybe we should try"),   # 1 hedge
+            _turn("We must do this now"),    # 1 assert
+            _turn("We need to fix it"),      # 1 assert (need to)
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["certainty_markers"]["hedging_count"] >= 1
+        assert result["certainty_markers"]["assertive_count"] >= 2
+        assert result["certainty_markers"]["ratio"] is not None
+        assert result["certainty_markers"]["ratio"] > 1.0  # more assertive than hedging
+
+    def test_certainty_markers_no_hedging(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("You must fix this"), _turn("Ensure it works")]
+        result = compute_prompt_linguistics(turns)
+        assert result["certainty_markers"]["ratio"] is None
+
+    def test_agency_framing_i_dominant(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("I want to understand this"),
+            _turn("I need the tests to pass"),
+            _turn("I think we should refactor"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["agency_framing"]["i_count"] >= 3
+        assert result["agency_framing"]["dominant"] == "i"
+
+    def test_agency_framing_we_dominant(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("We should refactor this"),
+            _turn("We could use a different approach"),
+            _turn("We need more tests"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["agency_framing"]["we_count"] >= 3
+        assert result["agency_framing"]["dominant"] == "we"
+
+    def test_agency_framing_you_dominant(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("You should fix this"),
+            _turn("You can read the file"),
+            _turn("You need to handle errors"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["agency_framing"]["you_count"] >= 3
+        assert result["agency_framing"]["dominant"] == "you"
+
+    def test_agency_framing_lets_dominant(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [
+            _turn("Let's fix this bug"),
+            _turn("Let's think about it"),
+            _turn("Let's add some tests"),
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["agency_framing"]["lets_count"] >= 3
+        assert result["agency_framing"]["dominant"] == "lets"
+
+    def test_agency_framing_none(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("Fix the bug"), _turn("Add tests")]
+        result = compute_prompt_linguistics(turns)
+        assert result["agency_framing"]["dominant"] == "none"
+
+    def test_prompt_length_by_position(self):
+        from transcript_reader import compute_prompt_linguistics
+        # 8 prompts with known word counts: 2,2, 5,5,5,5, 10,10
+        turns = [
+            _turn("word word"),                           # first quarter
+            _turn("word word"),                           # first quarter
+            _turn("word word word word word"),             # middle half
+            _turn("word word word word word"),             # middle half
+            _turn("word word word word word"),             # middle half
+            _turn("word word word word word"),             # middle half
+            _turn("word word word word word word word word word word"),  # last quarter
+            _turn("word word word word word word word word word word"),  # last quarter
+        ]
+        result = compute_prompt_linguistics(turns)
+        assert result["prompt_length_by_position"]["first_quarter_avg"] == 2.0
+        assert result["prompt_length_by_position"]["middle_half_avg"] == 5.0
+        assert result["prompt_length_by_position"]["last_quarter_avg"] == 10.0
+
+    def test_prompt_length_by_position_few_prompts(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn("one two"), _turn("one two three")]
+        result = compute_prompt_linguistics(turns)
+        # Should not crash; all buckets should have values
+        assert result["prompt_length_by_position"]["first_quarter_avg"] > 0
+        assert result["prompt_length_by_position"]["middle_half_avg"] > 0
+        assert result["prompt_length_by_position"]["last_quarter_avg"] > 0
+
+    def test_blank_prompts_excluded(self):
+        from transcript_reader import compute_prompt_linguistics
+        turns = [_turn(""), _turn("   "), _turn("Fix the bug")]
+        result = compute_prompt_linguistics(turns)
+        assert result["prompt_length"]["count"] == 1  # only "Fix the bug"
+
+
 # --- Tests: CLI ---
 
 class TestCLI:
