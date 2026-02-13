@@ -8,6 +8,7 @@ Covers:
 """
 
 import json
+import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -562,3 +563,79 @@ class TestGetTurnsSince:
                                 transcript_dir=tmp_path / "nope")
         assert result["turn_count"] == 0
         assert result["turns"] == []
+
+
+# --- Tests: CLI ---
+
+class TestCLI:
+    """Test the main() CLI interface via monkeypatching."""
+
+    def test_cli_usage_on_no_args(self, monkeypatch):
+        import transcript_reader as reader
+        monkeypatch.setattr("sys.argv", ["transcript_reader.py"])
+        with pytest.raises(SystemExit) as exc_info:
+            reader.main()
+        assert exc_info.value.code == 1
+
+    def test_cli_analyze(self, tmp_path, monkeypatch, capsys):
+        """CLI analyze command works."""
+        import transcript_reader as reader
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        _write_session(project_dir, "sess.jsonl", [
+            _queue_entry(timestamp=ts),
+            _user_entry("Hello", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "Hi"}], timestamp=ts),
+        ])
+        monkeypatch.setattr(reader, "get_transcript_dir", lambda cwd: project_dir)
+        monkeypatch.setattr("sys.argv",
+                          ["transcript_reader.py", "analyze", "/tmp/proj", _ts(10)])
+        reader.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["turn_count"] == 1
+
+    def test_cli_sessions(self, tmp_path, monkeypatch, capsys):
+        """CLI sessions command lists sessions."""
+        import transcript_reader as reader
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        _write_session(project_dir, "sess.jsonl", [
+            _queue_entry(timestamp=ts),
+            _user_entry("Hello", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "Hi"}], timestamp=ts),
+        ])
+        monkeypatch.setattr(reader, "get_transcript_dir", lambda cwd: project_dir)
+        monkeypatch.setattr("sys.argv",
+                          ["transcript_reader.py", "sessions", "/tmp/proj"])
+        reader.main()
+        data = json.loads(capsys.readouterr().out)
+        assert len(data) == 1
+
+    def test_cli_stats(self, tmp_path, monkeypatch, capsys):
+        """CLI stats command returns aggregated stats."""
+        import transcript_reader as reader
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        _write_session(project_dir, "sess.jsonl", [
+            _queue_entry(timestamp=ts),
+            _user_entry("Hello", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "Hi"}],
+                           input_tokens=50, output_tokens=20, timestamp=ts),
+        ])
+        monkeypatch.setattr(reader, "get_transcript_dir", lambda cwd: project_dir)
+        monkeypatch.setattr("sys.argv",
+                          ["transcript_reader.py", "stats", "/tmp/proj", _ts(10)])
+        reader.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["turn_count"] == 1
+        assert data["token_stats"]["total_input"] == 50
+
+    def test_cli_unknown_command(self, monkeypatch):
+        import transcript_reader as reader
+        monkeypatch.setattr("sys.argv", ["transcript_reader.py", "bogus", "/tmp"])
+        with pytest.raises(SystemExit) as exc_info:
+            reader.main()
+        assert exc_info.value.code == 1

@@ -127,6 +127,69 @@ class TestHandleSessionStart:
         assert "boom" in log_content
 
 
+class TestMain:
+    """Test the main() entry point."""
+
+    def test_main_install(self, tmp_path, monkeypatch):
+        """--install flag triggers install_hooks."""
+        import confessional_hook
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text("{}")
+        monkeypatch.setattr(confessional_hook, "_settings_path",
+                          lambda: settings_path)
+        monkeypatch.setattr("sys.argv", ["confessional_hook.py", "--install"])
+
+        confessional_hook.main()
+
+        settings = json.loads(settings_path.read_text())
+        assert "SessionStart" in settings.get("hooks", {})
+
+    def test_main_uninstall(self, tmp_path, monkeypatch):
+        """--uninstall flag triggers uninstall_hooks."""
+        import confessional_hook
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text("{}")
+        monkeypatch.setattr(confessional_hook, "_settings_path",
+                          lambda: settings_path)
+        # Install first
+        monkeypatch.setattr("sys.argv", ["confessional_hook.py", "--install"])
+        confessional_hook.main()
+        # Now uninstall
+        monkeypatch.setattr("sys.argv", ["confessional_hook.py", "--uninstall"])
+        confessional_hook.main()
+
+    def test_main_hook_mode_session_start(self, recording_project, monkeypatch,
+                                            tmp_path):
+        """Normal hook mode reads JSON from stdin and dispatches."""
+        import confessional_hook
+        import io
+        monkeypatch.setattr(confessional_hook, "get_project_name",
+                          lambda cwd: recording_project)
+        monkeypatch.setattr("sys.argv", ["confessional_hook.py"])
+
+        # Make breakpoint recent so it won't create auto-breakpoint
+        hook_input = json.dumps({
+            "hook_event_name": "SessionStart",
+            "cwd": "/tmp/fake",
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(hook_input))
+
+        with pytest.raises(SystemExit) as exc_info:
+            confessional_hook.main()
+        assert exc_info.value.code == 0
+
+    def test_main_hook_mode_bad_stdin(self, monkeypatch):
+        """Bad JSON on stdin exits cleanly."""
+        import confessional_hook
+        import io
+        monkeypatch.setattr("sys.argv", ["confessional_hook.py"])
+        monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
+
+        with pytest.raises(SystemExit) as exc_info:
+            confessional_hook.main()
+        assert exc_info.value.code == 0
+
+
 class TestInstallHooks:
 
     def test_installs_only_session_start(self, tmp_path, monkeypatch):
@@ -147,6 +210,29 @@ class TestInstallHooks:
         settings = json.loads(settings_path.read_text())
         assert "SessionStart" in settings.get("hooks", {})
         assert "Stop" not in settings.get("hooks", {})
+
+    def test_install_already_installed(self, tmp_path, monkeypatch):
+        """install_hooks skips when hooks already present."""
+        from confessional_hook import install_hooks, _make_hook_entry
+        import confessional_hook
+
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text("{}")
+        monkeypatch.setattr(confessional_hook, "_settings_path",
+                          lambda: settings_path)
+
+        install_hooks()  # First time
+        install_hooks()  # Second time — should print "already installed"
+
+    def test_uninstall_no_settings(self, tmp_path, monkeypatch):
+        """uninstall_hooks handles missing settings.json gracefully."""
+        import confessional_hook
+        settings_path = tmp_path / "nonexistent" / "settings.json"
+        monkeypatch.setattr(confessional_hook, "_settings_path",
+                          lambda: settings_path)
+
+        # Should not raise
+        confessional_hook.uninstall_hooks()
 
     def test_uninstall_removes_hooks(self, tmp_path, monkeypatch):
         """uninstall_hooks removes the SessionStart hook."""

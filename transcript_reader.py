@@ -396,7 +396,7 @@ def get_turns_since(cwd: str, since_timestamp: str, transcript_dir=None) -> dict
     }
 
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 3:
         print("Usage: transcript_reader.py <command> <cwd> [since_timestamp]")
         print("Commands: analyze, sessions, stats")
@@ -435,3 +435,7 @@ if __name__ == "__main__":
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -9,6 +9,7 @@ Covers:
 """
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -228,3 +229,122 @@ class TestRecordingState:
     def test_config_missing_returns_false(self, project):
         """No config.json at all → not recording."""
         assert store.is_recording(project) is False
+
+
+# --- Tests: CLI ---
+
+class TestCLI:
+    """Test the main() CLI interface via monkeypatching."""
+
+    def test_cli_usage_on_no_args(self, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["confessional_store.py"])
+        with pytest.raises(SystemExit) as exc_info:
+            store.main()
+        assert exc_info.value.code == 1
+
+    def test_cli_init(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv", ["confessional_store.py", "init", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out.strip().split("\n")[-1])
+        assert data["initialized"] is True
+
+    def test_cli_breakpoint(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "breakpoint", project, "test note"])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["note"] == "test note"
+
+    def test_cli_get_current_breakpoint(self, monkeypatch, capsys, project):
+        store.add_breakpoint(project, "bp1")
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_current_breakpoint", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["note"] == "bp1"
+
+    def test_cli_get_current_breakpoint_none(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_current_breakpoint", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert "error" in data
+
+    def test_cli_get_previous_breakpoint(self, monkeypatch, capsys, project):
+        store.add_breakpoint(project, "bp1")
+        store.add_breakpoint(project, "bp2")
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_previous_breakpoint", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["note"] == "bp1"
+
+    def test_cli_get_previous_breakpoint_none(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_previous_breakpoint", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert "error" in data
+
+    def test_cli_store_reflection_stdin(self, monkeypatch, capsys, project):
+        import io
+        monkeypatch.setattr("sys.stdin", io.StringIO("My reflection text"))
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "store_reflection", project,
+                           "git-sum", "5", "--stdin"])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["stored"] is True
+
+    def test_cli_store_reflection_positional(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "store_reflection", project,
+                           "reflection text", "git-sum", "3"])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["stored"] is True
+
+    def test_cli_get_reflections(self, monkeypatch, capsys, project):
+        store.store_reflection(project, "ref text", "sum", 1)
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_reflections", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert len(data) == 1
+
+    def test_cli_get_reflections_summary(self, monkeypatch, capsys, project):
+        store.store_reflection(project, "ref text", "sum", 1)
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_reflections_summary", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert len(data) == 1
+
+    def test_cli_enable_recording(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "enable_recording", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["recording"] is True
+
+    def test_cli_disable_recording(self, monkeypatch, capsys, project):
+        store.enable_recording(project)
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "disable_recording", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["recording"] is False
+
+    def test_cli_is_recording(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "is_recording", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["recording"] is False
+
+    def test_cli_unknown_command(self, monkeypatch, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "bogus", project])
+        with pytest.raises(SystemExit) as exc_info:
+            store.main()
+        assert exc_info.value.code == 1

@@ -1,31 +1,26 @@
-"""Smoke test to verify test infrastructure works."""
+"""Smoke tests to verify test infrastructure and basic module imports."""
 
-import reflection_db as db
-
-
-def test_db_initializes(isolated_db):
-    """DB initializes without error and tables exist."""
-    conn = db.get_connection()
-    tables = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-    ).fetchall()
-    table_names = [t[0] for t in tables]
-    conn.close()
-
-    assert "breakpoints" in table_names
-    assert "prompts" in table_names
-    assert "responses" in table_names
-    assert "tool_usage" in table_names
-    assert "recording_state" in table_names
+import confessional_store as store
+import transcript_reader as reader
+import confessional_hook as hook
 
 
-def test_fixtures_isolated(project, seeded_project, conn):
-    """Seeded project has recording enabled and a breakpoint."""
-    row = conn.execute(
-        "SELECT enabled FROM recording_state WHERE project = ?", (project,)
-    ).fetchone()
-    assert row is not None
-    assert row[0] == 1
+def test_store_imports():
+    """confessional_store module imports and has key functions."""
+    assert callable(store.add_breakpoint)
+    assert callable(store.store_reflection)
+    assert callable(store.is_recording)
 
-    bp = db.get_current_breakpoint(conn, project)
-    assert bp is not None
+
+def test_reader_imports():
+    """transcript_reader module imports and has key functions."""
+    assert callable(reader.get_transcript_dir)
+    assert callable(reader.find_sessions)
+    assert callable(reader.parse_session)
+    assert callable(reader.get_turns_since)
+
+
+def test_hook_imports():
+    """confessional_hook module imports and has key functions."""
+    assert callable(hook.handle_session_start)
+    assert callable(hook.get_project_name)

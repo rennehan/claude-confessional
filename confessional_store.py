@@ -20,7 +20,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-STORE_DIR = Path.home() / ".reflection"
+STORE_DIR = Path(os.environ.get("CONFESSIONAL_STORE_DIR", str(Path.home() / ".reflection")))
 CONFIG_PATH = STORE_DIR / "config.json"
 
 
@@ -185,7 +185,7 @@ def is_recording(project):
 
 # --- CLI ---
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 3:
         print("Usage: confessional_store.py <command> <project> [args...] [--stdin]")
         print("Commands: breakpoint, get_current_breakpoint, get_previous_breakpoint,")
@@ -259,3 +259,7 @@ if __name__ == "__main__":
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

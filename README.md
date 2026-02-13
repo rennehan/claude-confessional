@@ -1,10 +1,10 @@
-# claude-confessional 🙏
+# claude-confessional
 
 *Because every prompt deserves absolution.*
 
 You've been talking to Claude for hours. Days. Weeks. You've developed habits, tics, patterns — a whole liturgy of prompting that you're not even conscious of. You say "let's think about this" when you're not ready to commit. You say "this is fine" when you want Claude to shut up and move on. You have a *methodology*, and you don't even know what it is.
 
-**confessional** records everything — your prompts, Claude's responses, every tool call, every sub-agent spawn — and then reflects it back to you. Not what you talked about. *How you think.*
+**confessional** analyzes your conversations — reading Claude Code's native transcripts on-demand — and reflects your methodology back to you. Not what you talked about. *How you think.*
 
 Welcome to the Church of Claude. Please be seated.
 
@@ -18,9 +18,10 @@ mkdir -p ~/.claude/commands ~/.claude/scripts
 cp record.md ~/.claude/commands/
 cp breakpoint.md ~/.claude/commands/
 cp reflect.md ~/.claude/commands/
-cp reflection_db.py ~/.claude/scripts/
+cp confessional_store.py ~/.claude/scripts/
+cp transcript_reader.py ~/.claude/scripts/
 cp confessional_hook.py ~/.claude/scripts/
-chmod +x ~/.claude/scripts/reflection_db.py ~/.claude/scripts/confessional_hook.py
+chmod +x ~/.claude/scripts/confessional_store.py ~/.claude/scripts/transcript_reader.py ~/.claude/scripts/confessional_hook.py
 
 # Register the system hooks
 python3 ~/.claude/scripts/confessional_hook.py --install
@@ -30,18 +31,31 @@ Restart Claude Code after installing hooks.
 
 ## How It Works
 
-Recording is powered by **Claude Code hooks** — system-level event handlers that fire automatically on every interaction. When you run `/record` in a project, it enables recording for that project. From then on, two hooks handle everything silently:
+**Zero duplication.** Conversation data already lives in Claude Code's native JSONL transcripts at `~/.claude/projects/`. confessional reads that data on-demand — it never copies it.
 
-- **Stop hook** — fires after every Claude response, parses the conversation transcript, and records the prompt, response, and all tool calls to the database.
-- **SessionStart hook** — fires when a new session begins, recording session context (git branch, commit, etc.).
+confessional only stores what's *unique*:
 
-No per-turn overhead. No tokens spent on bookkeeping. No reliance on Claude remembering to record. Just lossless, automatic capture.
+- **Breakpoints** — session boundaries you define (`~/.reflection/projects/<project>/breakpoints.jsonl`)
+- **Reflections** — methodology analyses (`~/.reflection/projects/<project>/reflections.jsonl`)
+- **Recording state** — which projects are active (`~/.reflection/config.json`)
+
+Everything is plain text. No SQL. No database. Just JSON and JSONL files you can `cat`, pipe to an LLM, or load into any tool.
+
+### Architecture
+
+| Module | Purpose |
+|--------|---------|
+| `confessional_store.py` | Breakpoints, reflections, recording state (JSON/JSONL I/O) |
+| `transcript_reader.py` | Reads native JSONL transcripts, extracts turns/tools/metrics |
+| `confessional_hook.py` | SessionStart hook only (auto-breakpoints when sessions are >4h apart) |
+
+A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no tokens spent on bookkeeping.
 
 ## The Sacred Ritual
 
 ### `/record` — Begin Confession
 
-Enable recording for the current project. Every prompt you utter and every response Claude gives is written to the eternal ledger at `~/.reflection/history.db`. Tool calls, sub-agent spawns, session context — all of it. Claude works normally, but now God is watching.
+Enable recording for the current project. From then on, confessional tracks your session boundaries and can analyze your conversation data on-demand. Claude works normally, but now God is watching.
 
 Recording persists across sessions — once enabled, it stays on until you disable it.
 
@@ -55,35 +69,43 @@ Mark the end of a work session. Optionally attach a note for the historical reco
 
 ### `/reflect` — Receive Your Sermon
 
-Claude examines your sins — every prompt, response, tool call, and git commit since the last breakpoint — and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
+Claude examines your sins — reading every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts — and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
+
+The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
 
 Reflections accumulate. Over time, Claude can trace the evolution of your methodology. You're not just building software. You're building a doctrine.
 
 ## The Loop
 
 ```
-/record          ← enter the confessional (once per project)
+/record          <- enter the confessional (once per project)
   ... work ...
-/breakpoint      ← say amen
-/reflect         ← receive your sermon
-  ... work ...   ← recording continues automatically
-/breakpoint      ← say amen again
+/breakpoint      <- say amen
+/reflect         <- receive your sermon
+  ... work ...   <- recording continues automatically
+/breakpoint      <- say amen again
 ```
 
-## What Gets Recorded
+## What Gets Stored
 
-| Table | The Sacred Record |
-|-------|-------------------|
-| `breakpoints` | Session boundaries — where one mass ends and another begins |
-| `prompts` | Every word you speak to Claude, timestamped for eternity |
-| `responses` | Every word Claude speaks back, in full |
-| `tool_usage` | Every tool call, file touch, and sub-agent spawn |
-| `turn_blocks` | The ordered reasoning narrative — text, tool_use, and tool_result blocks in sequence |
-| `session_context` | Model, git branch, MCP servers, CLAUDE.md hash |
-| `reflections` | The sermons — Claude's analysis of your methodology |
-| `recording_state` | Per-project recording toggle — who's in the confessional |
+| File | The Sacred Record |
+|------|-------------------|
+| `breakpoints.jsonl` | Session boundaries — where one mass ends and another begins |
+| `reflections.jsonl` | The sermons — Claude's analysis of your methodology |
+| `config.json` | Per-project recording toggle — who's in the confessional |
 
-Everything lives in `~/.reflection/history.db` (SQLite). Portable, queryable, and ready for the afterlife.
+Everything lives in `~/.reflection/` as plain JSON/JSONL. Human-readable, LLM-loadable, and ready for the afterlife.
+
+## What Gets *Read* (Not Copied)
+
+Claude Code's native transcripts at `~/.claude/projects/` contain everything:
+
+- Every prompt and response, timestamped
+- Every tool call with inputs and outputs
+- Token usage, cache metrics, model info
+- Session IDs, git branches, stop reasons
+
+confessional reads this on-demand via `transcript_reader.py`. No duplication. The native transcripts are the source of truth.
 
 ## What `/reflect` Actually Does
 
@@ -93,6 +115,7 @@ It doesn't summarize your conversation. Any chatbot can do that. It extracts you
 - **Your language** — What phrases signal intent? When you say "what about X?" do you mean "do X" or "I'm exploring"?
 - **Your corrections** — When do you push back? What triggers a redirect?
 - **Your tool patterns** — Heavy on file reads = exploring. Heavy on writes = building. Heavy on bash = debugging. The tools tell the truth.
+- **Your token economics** — Cache hit rate, cost per turn, output verbosity. Are you being efficient?
 - **Your evolution** — How your methodology changes across sessions, across weeks, across projects.
 
 ## Why
@@ -118,10 +141,10 @@ cp sermon.md ~/.claude/commands/
 Then your ritual becomes:
 
 ```
-/confess         ← kneel and begin
+/confess         <- kneel and begin
   ... work ...
-/amen            ← close the prayer
-/sermon          ← receive the word
+/amen            <- close the prayer
+/sermon          <- receive the word
 ```
 
 Same functionality, more piety. Both sets can coexist — use whichever matches your current level of devotion.
@@ -130,16 +153,13 @@ Same functionality, more piety. Both sets can coexist — use whichever matches 
 
 ```bash
 # Enable recording for a project
-python3 ~/.claude/scripts/reflection_db.py enable_recording "<project>"
+python3 ~/.claude/scripts/confessional_store.py enable_recording "<project>"
 
 # Disable recording for a project
-python3 ~/.claude/scripts/reflection_db.py disable_recording "<project>"
+python3 ~/.claude/scripts/confessional_store.py disable_recording "<project>"
 
 # Check recording status
-python3 ~/.claude/scripts/reflection_db.py is_recording "<project>"
-
-# View stats
-python3 ~/.claude/scripts/reflection_db.py stats "<project>"
+python3 ~/.claude/scripts/confessional_store.py is_recording "<project>"
 
 # Uninstall hooks
 python3 ~/.claude/scripts/confessional_hook.py --uninstall

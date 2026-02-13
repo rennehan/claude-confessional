@@ -28,5 +28,6 @@ Every piece of work follows this loop:
 
 - **Minimum necessary complexity.** Three similar lines > premature abstraction.
 - **No speculative features.** Build for the current requirement, not hypothetical futures.
-- **Additive changes preferred.** New tables alongside old ones, not migrations that break existing queries.
+- **No data duplication.** Read from the source of truth (native JSONL) on-demand. Only store what's unique to this tool (breakpoints, reflections, recording state).
+- **Plain text over databases.** JSON and JSONL files are human-readable, LLM-loadable, crash-safe (append-only), and need no driver or schema. SQLite is overkill for a few KB of metadata.
 - **Silent correctness.** Hooks exit 0. Errors log, never block. The tool serves the user, not the other way around.

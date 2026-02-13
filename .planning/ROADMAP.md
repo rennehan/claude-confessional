@@ -1,28 +1,29 @@
 # Roadmap
 
-## Recording Fidelity
+## Pure JSON Redesign (Completed)
 
-- [x] **Harden `parse_last_turn` for structured user content** — Handle multi-part user messages (images, skill expansions, system injections) instead of returning empty string for non-string content
-- [x] **Capture full response narrative with tool call ordering** — turn_blocks table preserves interleaved text/tool_use/tool_result sequence per turn
-- [x] **Fix empty response recording** — Turns where Claude only makes tool calls (no text blocks) now record a synthetic summary like `[tool-only turn: Read, Edit]`
-- [x] **Add deduplication** — transcript_offset tracked per prompt; duplicate offsets skipped in record_interaction
+- [x] **Build `transcript_reader.py`** — Reads Claude Code's native JSONL transcripts on-demand, extracts structured turns, tools, token metrics, session metadata
+- [x] **Build `confessional_store.py`** — Pure JSON/JSONL storage for breakpoints, reflections, recording state. No SQL.
+- [x] **Slim `confessional_hook.py`** — SessionStart hook only. Removed Stop hook and all per-turn recording logic.
+- [x] **Update all commands** — reflect.md, sermon.md, record.md, confess.md, breakpoint.md, amen.md now use `confessional_store.py` and `transcript_reader.py`
+- [x] **Delete old code** — Removed `reflection_db.py` (SQLite) and all associated tests
+- [x] **95% test coverage** — 95 tests across 4 test files
 
-## Error Handling & Observability
+## Previous Work (Superseded by Redesign)
 
-- [x] **Add hook error logging** — Errors in handle_stop and handle_session_start now logged to `~/.reflection/hook.log` via get_logger(); exit-0 behavior preserved
-- [x] **Fill `session_context.model` from hooks** — Accepted gap: model is only populated when `/record` is explicitly run. SessionStart payload doesn't include it. Documented in PLAN.md.
+- [x] Harden `parse_last_turn` for structured user content — *moved to transcript_reader.py*
+- [x] Capture full response narrative with tool call ordering — *built into parse_session*
+- [x] Fix empty response recording — *tool-only turns get synthetic summary*
+- [x] Add deduplication — *no longer needed (JSONL is source of truth)*
+- [x] Add hook error logging — *preserved in slimmed hook*
+- [x] Add sequence ordering to tool calls and response blocks — *built into parse_session blocks*
+- [x] Revisit breakpoint semantics — *auto-breakpoints on SessionStart when >4h stale*
+- [x] Include tool call ordering in reflection data — *turn blocks with sequence in parse_session*
+- [x] Cross-session reflection — *get_reflections_summary in confessional_store*
 
-## Data Model
+## Future
 
-- [x] **Add sequence ordering to tool calls and response blocks** — Implemented via turn_blocks table with sequence column; get_turn_blocks retrieves ordered blocks grouped by prompt_id
-- [x] **Revisit breakpoint semantics** — Auto-breakpoint created on SessionStart when last breakpoint is >4 hours old; prevents unbounded reflection windows
-
-## Reflection Quality
-
-- [x] **Include tool call ordering in reflection data** — get_all_since_breakpoint now includes turn_blocks; reflect.md pulls get_turn_blocks for reasoning flow analysis
-- [x] **Cross-session reflection** — get_reflections_summary added; reflect.md pulls previous reflections and includes Methodology Evolution section
-
-## Housekeeping
-
-- [x] **Add `recording_state` table to README** — Added to "What Gets Recorded" table
-- [x] **`.planning/` directory** — Kept git-tracked intentionally as project reference
+- [ ] **Migration tool** — Script to migrate existing SQLite data to JSONL (for users upgrading from v1)
+- [ ] **Token budget tracking** — Track cumulative token spend per project across reflections
+- [ ] **Reflection diffing** — Compare methodology across reflections to surface evolution patterns
+- [ ] **Multi-project dashboard** — Aggregate patterns across projects
