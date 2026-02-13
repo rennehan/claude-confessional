@@ -199,9 +199,15 @@ def parse_last_turn(transcript_path):
     if not response_texts and not tools:
         return None
 
+    # Synthesize a response summary for tool-only turns
+    response = "\n\n".join(response_texts)
+    if not response and tools:
+        tool_names = ", ".join(t["tool_name"] for t in tools)
+        response = f"[tool-only turn: {tool_names}]"
+
     return {
         "prompt": prompt_text,
-        "response": "\n\n".join(response_texts),
+        "response": response,
         "tools": tools,
     }
 
