@@ -49,50 +49,50 @@ Everything is plain text. No SQL. No database. Just JSON and JSONL files you can
 
 A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no tokens spent on bookkeeping.
 
-## The Sacred Ritual
+## Usage
 
-### `/record` — Begin Confession
+### `/record` — Start Recording
 
-Enable recording for the current project. From then on, confessional tracks your session boundaries and can analyze your conversation data on-demand. Claude works normally, but now God is watching.
+Enable recording for the current project. From then on, confessional tracks your session boundaries and can analyze your conversation data on-demand.
 
 Recording persists across sessions — once enabled, it stays on until you disable it.
 
-### `/breakpoint` — Say Your Amen
+### `/breakpoint` — Mark a Session Boundary
 
-Mark the end of a work session. Optionally attach a note for the historical record:
+Mark the end of a work session. Optionally attach a note:
 
 ```
-/breakpoint Mass is over. We built a knowledge graph.
+/breakpoint Finished the auth refactor.
 ```
 
-### `/reflect` — Receive Your Sermon
+### `/reflect` — Analyze Your Methodology
 
-Claude examines your sins — reading every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts — and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
+Claude reads every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
 
 The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
 
-Reflections accumulate. Over time, Claude can trace the evolution of your methodology. You're not just building software. You're building a doctrine.
+Reflections accumulate. Over time, Claude can trace the evolution of your methodology.
 
 ## The Loop
 
 ```
-/record          <- enter the confessional (once per project)
+/record          <- enable recording (once per project)
   ... work ...
-/breakpoint      <- say amen
-/reflect         <- receive your sermon
+/breakpoint      <- mark a boundary
+/reflect         <- analyze your methodology
   ... work ...   <- recording continues automatically
-/breakpoint      <- say amen again
+/breakpoint      <- mark another boundary
 ```
 
 ## What Gets Stored
 
-| File | The Sacred Record |
-|------|-------------------|
-| `breakpoints.jsonl` | Session boundaries — where one mass ends and another begins |
-| `reflections.jsonl` | The sermons — Claude's analysis of your methodology |
-| `config.json` | Per-project recording toggle — who's in the confessional |
+| File | Contents |
+|------|----------|
+| `breakpoints.jsonl` | Session boundaries with timestamps and notes |
+| `reflections.jsonl` | Methodology analyses produced by `/reflect` |
+| `config.json` | Per-project recording toggle |
 
-Everything lives in `~/.reflection/` as plain JSON/JSONL. Human-readable, LLM-loadable, and ready for the afterlife.
+Everything lives in `~/.reflection/` as plain JSON/JSONL. Human-readable, LLM-loadable, and portable.
 
 ## What Gets *Read* (Not Copied)
 
