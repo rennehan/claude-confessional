@@ -12,32 +12,23 @@ Analyze all interactions since the last breakpoint to extract the user's prompti
 
 Determine the project:
 ```bash
-basename $(git rev-parse --show-toplevel 2>/dev/null || pwd)
+CWD=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PROJECT=$(basename "$CWD")
 ```
 
-Pull all interactions in the current window:
+Get the current breakpoint window:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py get_all_since_breakpoint "<project>"
+python3 ~/.claude/scripts/confessional_store.py get_current_breakpoint "$PROJECT"
 ```
 
-Pull tool usage data:
+Get all session data since the breakpoint (turns, tools, token metrics, session metadata):
 ```bash
-python3 ~/.claude/scripts/reflection_db.py get_tools_since_breakpoint "<project>"
+python3 ~/.claude/scripts/transcript_reader.py analyze "$CWD" "<breakpoint_timestamp>"
 ```
 
-Pull ordered turn blocks (the reasoning narrative — text/tool interleaving):
+Get previous reflections for cross-session comparison:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py get_turn_blocks "<project>"
-```
-
-Pull session context:
-```bash
-python3 ~/.claude/scripts/reflection_db.py get_session_context "<project>"
-```
-
-Pull previous reflections for cross-session comparison:
-```bash
-python3 ~/.claude/scripts/reflection_db.py get_reflections_summary "<project>"
+python3 ~/.claude/scripts/confessional_store.py get_reflections_summary "$PROJECT"
 ```
 
 Pull git history since the last breakpoint timestamp (if in a git repo):
@@ -83,7 +74,7 @@ Study the prompts and responses together. Extract:
 - How does the discussion map to the code changes?
 - Was there wasted effort — discussion that didn't lead to action?
 
-**Tool Behavior** (from tool usage data) — How was Claude used as a tool?
+**Tool Behavior** (from tool_stats) — How was Claude used as a tool?
 - What's the ratio of file reads to writes? (exploration vs. implementation)
 - How much bash usage? (debugging, testing, building)
 - Were sub-agents spawned? For what tasks? Did they succeed?
@@ -96,9 +87,16 @@ Study the prompts and responses together. Extract:
 - **Silent work ratio** — Turns with many tool calls but little text = autonomous work. Turns with much text and few tools = discussion mode.
 - What is the typical block sequence? (text → tool → text? Or tool → tool → tool → text?)
 
-**Session Context** — What was the environment?
-- What model was used? Any MCP tools available?
-- Did the CLAUDE.md change during the session?
+**Token Efficiency** (from token_stats) — How efficient was the session?
+- Total input/output tokens consumed
+- Cache hit rate (cache_read_tokens / total_input_tokens) — higher = better context reuse
+- Average tokens per prompt — are prompts concise or verbose?
+- Output verbosity — is Claude being terse or expansive?
+- Most expensive turns — were they worth it?
+
+**Session Context** (from sessions metadata) — What was the environment?
+- What model was used? Did it change during the session?
+- How many sessions were in this breakpoint window?
 - What branch was work happening on?
 
 ### 3. Produce the Reflection
@@ -111,20 +109,21 @@ Write a reflection that captures the methodology, not the content. Structure it 
 4. **Thinking Style** — How the user reasons and makes decisions
 5. **What Worked** — Moments where the collaboration was most productive
 6. **What Didn't** — Moments of friction, miscommunication, or wasted cycles
-7. **Methodology Extract** — A concise, reusable description of this user's working style that could inform future sessions
+7. **Session Economics** — Token usage, cache efficiency, cost-per-insight
+8. **Methodology Extract** — A concise, reusable description of this user's working style that could inform future sessions
 
 ### 4. Store and Present
 
 Store the reflection using `--stdin` with a heredoc to safely pass the reflection text:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py store_reflection "<project>" "<git_summary>" <prompt_count> --stdin <<'CONFESSIONAL_EOF'
+python3 ~/.claude/scripts/confessional_store.py store_reflection "$PROJECT" "<git_summary>" <prompt_count> --stdin <<'CONFESSIONAL_EOF'
 <reflection_text>
 CONFESSIONAL_EOF
 ```
 
 Check if there are previous reflections:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py get_reflections "<project>"
+python3 ~/.claude/scripts/confessional_store.py get_reflections "$PROJECT"
 ```
 
 If previous reflections exist, also include a **Methodology Evolution** section:
