@@ -34,26 +34,32 @@ python3 ~/.claude/scripts/reflection_db.py record_session_context "<project>" \
 
 From this point forward, for EVERY user prompt in this conversation:
 
-1. **Record the user's prompt** immediately when you receive it:
+1. **Record the user's prompt** immediately when you receive it, using `--stdin` with a heredoc to safely pass the text without shell escaping issues:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py record_prompt "<project>" "<the user's full prompt text>"
+python3 ~/.claude/scripts/reflection_db.py record_prompt "<project>" --stdin <<'CONFESSIONAL_EOF'
+<the user's full prompt text>
+CONFESSIONAL_EOF
 ```
 
 2. **Do your normal work** — answer the question, write code, whatever is asked.
 
-3. **Record tool usage** for each tool you invoke during your work:
+3. **Record tool usage** for each tool you invoke during your work, using `--stdin` with a heredoc for the input summary:
 ```bash
 python3 ~/.claude/scripts/reflection_db.py record_tool "<project>" "<prompt_id>" \
-  "<tool_name>" "<brief input summary>" "<comma-separated files touched>" \
+  "<tool_name>" "<comma-separated files touched>" \
   "<true if subagent, false otherwise>" "<subagent task description if applicable>" \
-  "<subagent result summary if applicable>" "<duration_ms if known>"
+  "<subagent result summary if applicable>" "<duration_ms if known>" --stdin <<'CONFESSIONAL_EOF'
+<brief input summary>
+CONFESSIONAL_EOF
 ```
 
 Tool names to record: Read, Write, Edit, Bash, WebSearch, WebFetch, Spawn (for sub-agents), and any MCP tool calls. For sub-agents, set is_subagent to "true" and include the task and result summary.
 
-4. **Record your full response** after you've completed your work:
+4. **Record your full response** after you've completed your work, using `--stdin` with a heredoc for the response text:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py record_response "<project>" "<prompt_id from step 1>" "<your full response text>"
+python3 ~/.claude/scripts/reflection_db.py record_response "<project>" "<prompt_id from step 1>" --stdin <<'CONFESSIONAL_EOF'
+<your full response text>
+CONFESSIONAL_EOF
 ```
 
 ## Important
@@ -61,7 +67,7 @@ python3 ~/.claude/scripts/reflection_db.py record_response "<project>" "<prompt_
 - Record EVERY interaction, no exceptions.
 - The prompt text should be the user's exact words.
 - The response text should be your complete response.
-- Escape quotes and special characters properly when passing to the shell.
+- Always use `--stdin` with a single-quoted heredoc delimiter (`<<'CONFESSIONAL_EOF'`) to pass text. This prevents shell expansion of quotes, dollar signs, backticks, and other special characters.
 - If the prompt_id is returned as JSON like `{"prompt_id": 5}`, extract the number.
 - Do NOT mention the recording to the user unless they ask. Just do your work normally while silently recording.
 - If the DB doesn't exist yet, init will create it automatically.

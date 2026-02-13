@@ -5,7 +5,6 @@ Database location: ~/.reflection/history.db
 """
 
 import sqlite3
-import os
 import sys
 import json
 from datetime import datetime, timezone
@@ -113,6 +112,14 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def safe_int(value, default=0):
+    """Safely convert a value to int, returning default on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def get_current_breakpoint(conn, project):
     """Get the most recent breakpoint for this project."""
     row = conn.execute(
@@ -174,7 +181,7 @@ def cmd_record_response(project, prompt_id, response_text):
     bp_id = bp["id"] if bp else None
     conn.execute(
         "INSERT INTO responses (prompt_id, project, breakpoint_id, timestamp, response) VALUES (?, ?, ?, ?, ?)",
-        (int(prompt_id), project, bp_id, now_iso(), response_text)
+        (safe_int(prompt_id), project, bp_id, now_iso(), response_text)
     )
     conn.commit()
     conn.close()
@@ -301,7 +308,7 @@ def cmd_store_reflection(project, reflection_text, git_summary="", prompt_count=
             now_iso(),
             reflection_text,
             git_summary,
-            int(prompt_count)
+            safe_int(prompt_count)
         )
     )
     conn.commit()
@@ -371,8 +378,8 @@ def cmd_record_tool(project, prompt_id, tool_name, tool_input_summary="", files_
            (prompt_id, project, timestamp, tool_name, tool_input_summary, files_touched,
             is_subagent, subagent_task, subagent_result_summary, duration_ms)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (int(prompt_id), project, now_iso(), tool_name, tool_input_summary, files_touched,
-         1 if is_subagent else 0, subagent_task, subagent_result_summary, int(duration_ms))
+        (safe_int(prompt_id), project, now_iso(), tool_name, tool_input_summary, files_touched,
+         1 if is_subagent else 0, subagent_task, subagent_result_summary, safe_int(duration_ms))
     )
     conn.commit()
     conn.close()
@@ -423,35 +430,56 @@ def cmd_get_session_context(project):
     conn.close()
 
 
-def cmd_token_summary(project):
-    pass  # removed
-
-
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: reflection_db.py <command> <project> [args...]")
+        print("Usage: reflection_db.py <command> <project> [args...] [--stdin]")
         print("Commands: init, record_prompt, record_response, breakpoint, get_window,")
-        print("          get_all_since_breakpoint, store_reflection, get_reflections, stats")
+        print("          get_all_since_breakpoint, store_reflection, get_reflections, stats,")
+        print("          record_session_context, record_tool, get_tools_since_breakpoint,")
+        print("          get_session_context")
+        print()
+        print("Use --stdin to read the primary text payload from stdin instead of argv.")
+        print("This avoids shell escaping issues with quotes, newlines, and special characters.")
         sys.exit(1)
 
-    command = sys.argv[1]
-    project = sys.argv[2]
+    # Strip --stdin flag from argv, note whether it was present
+    use_stdin = "--stdin" in sys.argv
+    argv = [a for a in sys.argv if a != "--stdin"]
+
+    command = argv[1]
+    project = argv[2]
+
+    def arg(index, default=""):
+        """Safely get a positional arg with a default."""
+        return argv[index] if len(argv) > index else default
+
+    stdin_text = sys.stdin.read() if use_stdin else None
 
     if command == "init":
         cmd_init(project)
     elif command == "record_prompt":
-        cmd_record_prompt(project, sys.argv[3])
+        # Without --stdin: record_prompt <project> <prompt_text>
+        # With --stdin:    record_prompt <project> --stdin  (prompt_text from stdin)
+        prompt_text = stdin_text if use_stdin else arg(3)
+        cmd_record_prompt(project, prompt_text)
     elif command == "record_response":
-        cmd_record_response(project, sys.argv[3], sys.argv[4])
+        # Without --stdin: record_response <project> <prompt_id> <response_text>
+        # With --stdin:    record_response <project> <prompt_id> --stdin  (response_text from stdin)
+        response_text = stdin_text if use_stdin else arg(4)
+        cmd_record_response(project, arg(3), response_text)
     elif command == "breakpoint":
-        note = sys.argv[3] if len(sys.argv) > 3 else ""
-        cmd_breakpoint(project, note)
+        cmd_breakpoint(project, arg(3, ""))
     elif command == "get_window":
         cmd_get_window(project)
     elif command == "get_all_since_breakpoint":
         cmd_get_all_since_breakpoint(project)
     elif command == "store_reflection":
-        cmd_store_reflection(project, sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "", sys.argv[5] if len(sys.argv) > 5 else 0)
+        # Without --stdin: store_reflection <project> <reflection_text> <git_summary> <prompt_count>
+        # With --stdin:    store_reflection <project> <git_summary> <prompt_count> --stdin  (reflection_text from stdin)
+        if use_stdin:
+            cmd_store_reflection(project, stdin_text, arg(3, ""), arg(4, 0))
+        else:
+            cmd_store_reflection(project, arg(3), arg(4, ""), arg(5, 0))
     elif command == "get_reflections":
         cmd_get_reflections(project)
     elif command == "stats":
@@ -459,30 +487,43 @@ if __name__ == "__main__":
     elif command == "record_session_context":
         cmd_record_session_context(
             project,
-            model=sys.argv[3] if len(sys.argv) > 3 else "",
-            git_branch=sys.argv[4] if len(sys.argv) > 4 else "",
-            git_commit=sys.argv[5] if len(sys.argv) > 5 else "",
-            mcp_servers=sys.argv[6] if len(sys.argv) > 6 else "",
-            claude_md_hash=sys.argv[7] if len(sys.argv) > 7 else ""
+            model=arg(3, ""),
+            git_branch=arg(4, ""),
+            git_commit=arg(5, ""),
+            mcp_servers=arg(6, ""),
+            claude_md_hash=arg(7, "")
         )
     elif command == "record_tool":
-        cmd_record_tool(
-            project,
-            prompt_id=sys.argv[3],
-            tool_name=sys.argv[4],
-            tool_input_summary=sys.argv[5] if len(sys.argv) > 5 else "",
-            files_touched=sys.argv[6] if len(sys.argv) > 6 else "",
-            is_subagent=sys.argv[7].lower() == "true" if len(sys.argv) > 7 else False,
-            subagent_task=sys.argv[8] if len(sys.argv) > 8 else "",
-            subagent_result_summary=sys.argv[9] if len(sys.argv) > 9 else "",
-            duration_ms=sys.argv[10] if len(sys.argv) > 10 else 0
-        )
+        # Without --stdin: record_tool <project> <prompt_id> <tool_name> <tool_input_summary> <files_touched> ...
+        # With --stdin:    record_tool <project> <prompt_id> <tool_name> <files_touched> ... --stdin  (tool_input_summary from stdin)
+        if use_stdin:
+            cmd_record_tool(
+                project,
+                prompt_id=arg(3),
+                tool_name=arg(4),
+                tool_input_summary=stdin_text,
+                files_touched=arg(5, ""),
+                is_subagent=arg(6, "false").lower() == "true",
+                subagent_task=arg(7, ""),
+                subagent_result_summary=arg(8, ""),
+                duration_ms=arg(9, 0)
+            )
+        else:
+            cmd_record_tool(
+                project,
+                prompt_id=arg(3),
+                tool_name=arg(4),
+                tool_input_summary=arg(5, ""),
+                files_touched=arg(6, ""),
+                is_subagent=arg(7, "false").lower() == "true",
+                subagent_task=arg(8, ""),
+                subagent_result_summary=arg(9, ""),
+                duration_ms=arg(10, 0)
+            )
     elif command == "get_tools_since_breakpoint":
         cmd_get_tools_since_breakpoint(project)
     elif command == "get_session_context":
         cmd_get_session_context(project)
-    elif command == "token_summary":
-        cmd_token_summary(project)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

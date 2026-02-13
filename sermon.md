@@ -99,9 +99,11 @@ Write a reflection that captures the methodology, not the content. Structure it 
 
 ### 4. Store and Present
 
-Store the reflection:
+Store the reflection using `--stdin` with a heredoc to safely pass the reflection text:
 ```bash
-python3 ~/.claude/scripts/reflection_db.py store_reflection "<project>" "<reflection_text>" "<git_summary>" <prompt_count>
+python3 ~/.claude/scripts/reflection_db.py store_reflection "<project>" "<git_summary>" <prompt_count> --stdin <<'CONFESSIONAL_EOF'
+<reflection_text>
+CONFESSIONAL_EOF
 ```
 
 Check if there are previous reflections:
