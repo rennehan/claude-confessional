@@ -111,6 +111,18 @@ def init_db():
             enabled_at TEXT,
             disabled_at TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS turn_blocks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prompt_id INTEGER NOT NULL,
+            project TEXT NOT NULL,
+            sequence INTEGER NOT NULL,
+            block_type TEXT NOT NULL,
+            content TEXT,
+            tool_name TEXT,
+            FOREIGN KEY (prompt_id) REFERENCES prompts(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_turn_blocks_prompt ON turn_blocks(prompt_id);
     """)
     conn.commit()
     conn.close()
@@ -450,6 +462,21 @@ def cmd_record_interaction(project, json_text):
         (prompt_id, project, bp_id, ts, data.get("response", ""))
     )
 
+    # 4. Insert turn blocks (if present)
+    for block in data.get("blocks", []):
+        conn.execute(
+            """INSERT INTO turn_blocks
+               (prompt_id, project, sequence, block_type, content, tool_name)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                prompt_id, project,
+                safe_int(block.get("sequence", 0)),
+                block.get("type", ""),
+                block.get("content", ""),
+                block.get("tool_name"),
+            )
+        )
+
     conn.commit()
     conn.close()
 
@@ -457,6 +484,45 @@ def cmd_record_interaction(project, json_text):
         print(json.dumps({"prompt_id": prompt_id}))
     else:
         print(prompt_id)
+
+
+def cmd_get_turn_blocks(project):
+    """Get ordered turn blocks since the last breakpoint, grouped by prompt_id.
+
+    Returns a list of dicts, each with prompt_id and blocks list.
+    """
+    init_db()
+    conn = get_connection()
+    bp = get_current_breakpoint(conn, project)
+    if bp is None:
+        conn.close()
+        return []
+
+    rows = conn.execute(
+        """SELECT tb.prompt_id, tb.sequence, tb.block_type, tb.content, tb.tool_name
+           FROM turn_blocks tb
+           JOIN prompts p ON tb.prompt_id = p.id
+           WHERE p.project = ? AND p.breakpoint_id = ?
+           ORDER BY tb.prompt_id ASC, tb.sequence ASC""",
+        (project, bp["id"])
+    ).fetchall()
+    conn.close()
+
+    # Group by prompt_id
+    turns = {}
+    for row in rows:
+        r = dict(row)
+        pid = r["prompt_id"]
+        if pid not in turns:
+            turns[pid] = {"prompt_id": pid, "blocks": []}
+        turns[pid]["blocks"].append({
+            "sequence": r["sequence"],
+            "block_type": r["block_type"],
+            "content": r["content"],
+            "tool_name": r["tool_name"],
+        })
+
+    return list(turns.values())
 
 
 def cmd_get_tools_since_breakpoint(project):

@@ -174,41 +174,72 @@ def parse_last_turn(transcript_path):
 
     prompt_text = _extract_user_prompt_text(lines[last_user_idx])
 
-    # Collect all assistant content blocks after the user prompt.
-    # Each transcript line has exactly one content block.
-    # Group by message.id to identify distinct API calls, but collect all blocks.
+    # Collect all content blocks after the user prompt.
+    # Build both the flat tools/response lists (for existing tables) and
+    # the ordered blocks list (for turn_blocks table).
     response_texts = []
     tools = []
+    blocks = []
+    seq = 0
+    # Track the last tool_use name so we can associate tool_result blocks
+    last_tool_name = ""
 
     for i in range(last_user_idx + 1, len(lines)):
         entry = lines[i]
-        if entry.get("type") != "assistant":
-            continue
+        entry_type = entry.get("type")
 
-        content = entry.get("message", {}).get("content", [])
-        if not isinstance(content, list):
-            continue
-
-        for block in content:
-            if not isinstance(block, dict):
+        if entry_type == "assistant":
+            content = entry.get("message", {}).get("content", [])
+            if not isinstance(content, list):
                 continue
 
-            if block.get("type") == "text":
-                text = block.get("text", "").strip()
-                if text:
-                    response_texts.append(text)
-            elif block.get("type") == "tool_use":
-                tool_input = block.get("input", {})
-                tool_name = block.get("name", "")
-                tools.append({
-                    "tool_name": tool_name,
-                    "input_summary": _summarize_tool_input(tool_name, tool_input),
-                    "files_touched": _extract_files(tool_name, tool_input),
-                    "is_subagent": tool_name == "Task",
-                    "subagent_task": tool_input.get("prompt", "")[:200] if tool_name == "Task" else "",
-                    "subagent_result_summary": "",
-                    "duration_ms": 0,
-                })
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+
+                if block.get("type") == "text":
+                    text = block.get("text", "").strip()
+                    if text:
+                        response_texts.append(text)
+                        blocks.append({"sequence": seq, "type": "text", "content": text})
+                        seq += 1
+                elif block.get("type") == "tool_use":
+                    tool_input = block.get("input", {})
+                    tool_name = block.get("name", "")
+                    last_tool_name = tool_name
+                    tools.append({
+                        "tool_name": tool_name,
+                        "input_summary": _summarize_tool_input(tool_name, tool_input),
+                        "files_touched": _extract_files(tool_name, tool_input),
+                        "is_subagent": tool_name == "Task",
+                        "subagent_task": tool_input.get("prompt", "")[:200] if tool_name == "Task" else "",
+                        "subagent_result_summary": "",
+                        "duration_ms": 0,
+                    })
+                    blocks.append({
+                        "sequence": seq, "type": "tool_use",
+                        "content": _summarize_tool_input(tool_name, tool_input),
+                        "tool_name": tool_name,
+                    })
+                    seq += 1
+
+        elif entry_type == "user":
+            # Tool result cycle — capture as a block
+            content = entry.get("message", {}).get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        result_content = block.get("content", "")
+                        if isinstance(result_content, str):
+                            result_text = result_content[:500]
+                        else:
+                            result_text = str(result_content)[:500]
+                        blocks.append({
+                            "sequence": seq, "type": "tool_result",
+                            "content": result_text,
+                            "tool_name": last_tool_name,
+                        })
+                        seq += 1
 
     if not response_texts and not tools:
         return None
@@ -223,6 +254,7 @@ def parse_last_turn(transcript_path):
         "prompt": prompt_text,
         "response": response,
         "tools": tools,
+        "blocks": blocks,
     }
 
 
