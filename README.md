@@ -1,12 +1,10 @@
-# claude-confessional
+# Claude Confessional 🙏
 
 *Because every prompt deserves absolution.*
 
 You've been talking to Claude for hours. Days. Weeks. You've developed habits, tics, patterns — a whole liturgy of prompting that you're not even conscious of. You say "let's think about this" when you're not ready to commit. You say "this is fine" when you want Claude to shut up and move on. You have a *methodology*, and you don't even know what it is.
 
 **confessional** analyzes your conversations — reading Claude Code's native transcripts on-demand — and reflects your methodology back to you. Not what you talked about. *How you think.*
-
-Welcome to the Church of Claude. Please be seated.
 
 ## Installation
 
