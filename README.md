@@ -19,14 +19,31 @@ cp record.md ~/.claude/commands/
 cp breakpoint.md ~/.claude/commands/
 cp reflect.md ~/.claude/commands/
 cp reflection_db.py ~/.claude/scripts/
-chmod +x ~/.claude/scripts/reflection_db.py
+cp confessional_hook.py ~/.claude/scripts/
+chmod +x ~/.claude/scripts/reflection_db.py ~/.claude/scripts/confessional_hook.py
+
+# Register the system hooks
+python3 ~/.claude/scripts/confessional_hook.py --install
 ```
+
+Restart Claude Code after installing hooks.
+
+## How It Works
+
+Recording is powered by **Claude Code hooks** — system-level event handlers that fire automatically on every interaction. When you run `/record` in a project, it enables recording for that project. From then on, two hooks handle everything silently:
+
+- **Stop hook** — fires after every Claude response, parses the conversation transcript, and records the prompt, response, and all tool calls to the database.
+- **SessionStart hook** — fires when a new session begins, recording session context (git branch, commit, etc.).
+
+No per-turn overhead. No tokens spent on bookkeeping. No reliance on Claude remembering to record. Just lossless, automatic capture.
 
 ## The Sacred Ritual
 
 ### `/record` — Begin Confession
 
-Start recording. Every prompt you utter and every response Claude gives is written to the eternal ledger at `~/.reflection/history.db`. Tool calls, sub-agent spawns, session context — all of it. Claude works normally, but now God is watching.
+Enable recording for the current project. Every prompt you utter and every response Claude gives is written to the eternal ledger at `~/.reflection/history.db`. Tool calls, sub-agent spawns, session context — all of it. Claude works normally, but now God is watching.
+
+Recording persists across sessions — once enabled, it stays on until you disable it.
 
 ### `/breakpoint` — Say Your Amen
 
@@ -45,12 +62,12 @@ Reflections accumulate. Over time, Claude can trace the evolution of your method
 ## The Loop
 
 ```
-/record          ← enter the confessional
+/record          ← enter the confessional (once per project)
   ... work ...
 /breakpoint      ← say amen
 /reflect         ← receive your sermon
-/record          ← return for more penance
-  ... work ...
+  ... work ...   ← recording continues automatically
+/breakpoint      ← say amen again
 ```
 
 ## What Gets Recorded
@@ -106,6 +123,25 @@ Then your ritual becomes:
 ```
 
 Same functionality, more piety. Both sets can coexist — use whichever matches your current level of devotion.
+
+## Managing Recording
+
+```bash
+# Enable recording for a project
+python3 ~/.claude/scripts/reflection_db.py enable_recording "<project>"
+
+# Disable recording for a project
+python3 ~/.claude/scripts/reflection_db.py disable_recording "<project>"
+
+# Check recording status
+python3 ~/.claude/scripts/reflection_db.py is_recording "<project>"
+
+# View stats
+python3 ~/.claude/scripts/reflection_db.py stats "<project>"
+
+# Uninstall hooks
+python3 ~/.claude/scripts/confessional_hook.py --uninstall
+```
 
 ## License
 

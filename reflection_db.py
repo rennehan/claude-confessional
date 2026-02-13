@@ -104,6 +104,13 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_session_context_breakpoint ON session_context(breakpoint_id);
         CREATE INDEX IF NOT EXISTS idx_tool_usage_prompt ON tool_usage(prompt_id);
         CREATE INDEX IF NOT EXISTS idx_tool_usage_project ON tool_usage(project);
+
+        CREATE TABLE IF NOT EXISTS recording_state (
+            project TEXT PRIMARY KEY,
+            enabled INTEGER DEFAULT 0,
+            enabled_at TEXT,
+            disabled_at TEXT
+        );
     """)
     conn.commit()
     conn.close()
@@ -496,13 +503,56 @@ def cmd_get_session_context(project):
     conn.close()
 
 
+def cmd_enable_recording(project):
+    """Enable automatic hook-based recording for a project."""
+    init_db()
+    conn = get_connection()
+    conn.execute(
+        """INSERT INTO recording_state (project, enabled, enabled_at)
+           VALUES (?, 1, ?)
+           ON CONFLICT(project) DO UPDATE SET enabled = 1, enabled_at = ?""",
+        (project, now_iso(), now_iso())
+    )
+    conn.commit()
+    conn.close()
+    print(json.dumps({"project": project, "recording": True}))
+
+
+def cmd_disable_recording(project):
+    """Disable automatic hook-based recording for a project."""
+    init_db()
+    conn = get_connection()
+    conn.execute(
+        """INSERT INTO recording_state (project, enabled, disabled_at)
+           VALUES (?, 0, ?)
+           ON CONFLICT(project) DO UPDATE SET enabled = 0, disabled_at = ?""",
+        (project, now_iso(), now_iso())
+    )
+    conn.commit()
+    conn.close()
+    print(json.dumps({"project": project, "recording": False}))
+
+
+def cmd_is_recording(project):
+    """Check if recording is enabled for a project."""
+    init_db()
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT enabled FROM recording_state WHERE project = ?", (project,)
+    ).fetchone()
+    conn.close()
+    enabled = bool(row and row[0])
+    print(json.dumps({"project": project, "recording": enabled}))
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: reflection_db.py <command> <project> [args...] [--stdin] [--verbose]")
         print("Commands: init, record_prompt, record_response, breakpoint, get_window,")
         print("          get_all_since_breakpoint, store_reflection, get_reflections, stats,")
         print("          record_session_context, record_tool, get_tools_since_breakpoint,")
-        print("          get_session_context, record_interaction")
+        print("          get_session_context, record_interaction,")
+        print("          enable_recording, disable_recording, is_recording")
         print()
         print("Use --stdin to read the primary text payload from stdin instead of argv.")
         print("This avoids shell escaping issues with quotes, newlines, and special characters.")
@@ -596,6 +646,12 @@ if __name__ == "__main__":
         cmd_get_tools_since_breakpoint(project)
     elif command == "get_session_context":
         cmd_get_session_context(project)
+    elif command == "enable_recording":
+        cmd_enable_recording(project)
+    elif command == "disable_recording":
+        cmd_disable_recording(project)
+    elif command == "is_recording":
+        cmd_is_recording(project)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
