@@ -10,7 +10,7 @@
 ## Error Handling & Observability
 
 - [x] **Add hook error logging** — Errors in handle_stop and handle_session_start now logged to `~/.reflection/hook.log` via get_logger(); exit-0 behavior preserved
-- [ ] **Fill `session_context.model` from hooks** — The `SessionStart` payload doesn't include model name, so it's always empty; find an alternative source or accept the gap and document it
+- [x] **Fill `session_context.model` from hooks** — Accepted gap: model is only populated when `/record` is explicitly run. SessionStart payload doesn't include it. Documented in PLAN.md.
 
 ## Data Model
 
@@ -24,5 +24,5 @@
 
 ## Housekeeping
 
-- [ ] **Add `recording_state` table to README** — Minor omission in the "What Gets Recorded" table
-- [ ] **Add `.planning/` to `.gitignore`** — Keep planning artifacts local
+- [x] **Add `recording_state` table to README** — Added to "What Gets Recorded" table
+- [ ] **Add `.planning/` to `.gitignore`** — Keeping in repo for now as development reference

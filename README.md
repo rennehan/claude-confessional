@@ -78,8 +78,10 @@ Reflections accumulate. Over time, Claude can trace the evolution of your method
 | `prompts` | Every word you speak to Claude, timestamped for eternity |
 | `responses` | Every word Claude speaks back, in full |
 | `tool_usage` | Every tool call, file touch, and sub-agent spawn |
+| `turn_blocks` | The ordered reasoning narrative — text, tool_use, and tool_result blocks in sequence |
 | `session_context` | Model, git branch, MCP servers, CLAUDE.md hash |
 | `reflections` | The sermons — Claude's analysis of your methodology |
+| `recording_state` | Per-project recording toggle — who's in the confessional |
 
 Everything lives in `~/.reflection/history.db` (SQLite). Portable, queryable, and ready for the afterlife.
 
