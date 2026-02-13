@@ -15,9 +15,23 @@ Remove:   python3 confessional_hook.py --uninstall
 import sys
 import json
 import os
+import logging
 import subprocess
 from pathlib import Path
 from collections import OrderedDict
+
+LOG_PATH = Path.home() / ".reflection" / "hook.log"
+
+
+def get_logger():
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("confessional")
+    if not logger.handlers:
+        handler = logging.FileHandler(str(LOG_PATH))
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.WARNING)
+    return logger
 
 # Import reflection_db from the same directory
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -220,15 +234,18 @@ def handle_stop(input_data):
     if not is_recording_enabled(project):
         return
 
-    transcript_path = input_data.get("transcript_path", "")
-    if not transcript_path or not os.path.exists(transcript_path):
-        return
+    try:
+        transcript_path = input_data.get("transcript_path", "")
+        if not transcript_path or not os.path.exists(transcript_path):
+            return
 
-    turn = parse_last_turn(transcript_path)
-    if turn is None:
-        return
+        turn = parse_last_turn(transcript_path)
+        if turn is None:
+            return
 
-    db.cmd_record_interaction(project, json.dumps(turn))
+        db.cmd_record_interaction(project, json.dumps(turn))
+    except Exception as e:
+        get_logger().error("handle_stop failed: %s", e, exc_info=True)
 
 
 def handle_session_start(input_data):
@@ -239,30 +256,33 @@ def handle_session_start(input_data):
     if not is_recording_enabled(project):
         return
 
-    db.cmd_init(project)
-
-    git_branch = ""
-    git_commit = ""
     try:
-        result = subprocess.run(
-            ["git", "branch", "--show-current"],
-            capture_output=True, text=True, cwd=cwd, timeout=5
-        )
-        if result.returncode == 0:
-            git_branch = result.stdout.strip()
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, cwd=cwd, timeout=5
-        )
-        if result.returncode == 0:
-            git_commit = result.stdout.strip()
-    except Exception:
-        pass
+        db.cmd_init(project)
 
-    # Model info isn't in SessionStart payload, record what we can
-    db.cmd_record_session_context(
-        project, model="", git_branch=git_branch, git_commit=git_commit
-    )
+        git_branch = ""
+        git_commit = ""
+        try:
+            result = subprocess.run(
+                ["git", "branch", "--show-current"],
+                capture_output=True, text=True, cwd=cwd, timeout=5
+            )
+            if result.returncode == 0:
+                git_branch = result.stdout.strip()
+            result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True, text=True, cwd=cwd, timeout=5
+            )
+            if result.returncode == 0:
+                git_commit = result.stdout.strip()
+        except Exception:
+            pass
+
+        # Model info isn't in SessionStart payload, record what we can
+        db.cmd_record_session_context(
+            project, model="", git_branch=git_branch, git_commit=git_commit
+        )
+    except Exception as e:
+        get_logger().error("handle_session_start failed: %s", e, exc_info=True)
 
 
 # --- Install / Uninstall ---

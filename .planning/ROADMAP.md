@@ -9,7 +9,7 @@
 
 ## Error Handling & Observability
 
-- [ ] **Add hook error logging** — Write failures to `~/.reflection/hook.log` instead of swallowing all exceptions silently; keep exit-0 behavior so Claude is never blocked
+- [x] **Add hook error logging** — Errors in handle_stop and handle_session_start now logged to `~/.reflection/hook.log` via get_logger(); exit-0 behavior preserved
 - [ ] **Fill `session_context.model` from hooks** — The `SessionStart` payload doesn't include model name, so it's always empty; find an alternative source or accept the gap and document it
 
 ## Data Model
