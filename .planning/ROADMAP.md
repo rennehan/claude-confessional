@@ -21,6 +21,15 @@
 - [x] Include tool call ordering in reflection data — *turn blocks with sequence in parse_session*
 - [x] Cross-session reflection — *get_reflections_summary in confessional_store*
 
+## Voice Analysis Engine (Completed)
+
+- [x] **`session_id` on turns** — Each turn carries its session ID for cross-session boundary detection
+- [x] **`compute_prompt_linguistics`** — Question ratio, imperative ratio, n-gram extraction, certainty markers, agency framing, prompt length distribution by position (25 tests)
+- [x] **`compute_effectiveness_signals`** — Correction detection, per-style effectiveness (question/imperative/statement), tool scatter, session progression with warming-up detection (19 tests)
+- [x] **Wired into `get_turns_since` + CLI** — Both analysis layers auto-computed and included in `analyze` and `stats` output (5 tests)
+- [x] **Voice Analysis in reflect.md / sermon.md** — Signature phrases, communication mode, certainty profile, effectiveness correlation, tool scatter, session arc
+- [x] **Smoke tests updated** — `compute_prompt_linguistics` and `compute_effectiveness_signals` importable
+
 ## Future
 
 - [ ] **Migration tool** — Script to migrate existing SQLite data to JSONL (for users upgrading from v1)

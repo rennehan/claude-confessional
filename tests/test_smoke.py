@@ -18,6 +18,8 @@ def test_reader_imports():
     assert callable(reader.find_sessions)
     assert callable(reader.parse_session)
     assert callable(reader.get_turns_since)
+    assert callable(reader.compute_prompt_linguistics)
+    assert callable(reader.compute_effectiveness_signals)
 
 
 def test_hook_imports():
