@@ -99,6 +99,15 @@ Study the prompts and responses together. Extract:
 - How many sessions were in this breakpoint window?
 - What branch was work happening on?
 
+**Voice Analysis** (from prompt_linguistics and effectiveness_signals) — What does the user's language reveal?
+
+- **Signature Phrases** — Top bigrams and trigrams with counts. What do repeated phrases reveal about the user's communication habits? (e.g., "for example" = reasoning by example, "what if" = exploratory thinking, "make sure" = quality-focused)
+- **Communication Mode** — Question ratio, imperative ratio, agency framing (I/we/you/let's). Is the user a questioner (exploring), commander (directing), or collaborator (partnering)? What does the dominant pronoun choice reveal about how they see the human-AI relationship?
+- **Certainty Profile** — Hedging vs assertive phrase counts and ratio. When is the user confident vs exploratory? Do they hedge more at the start of a session (warming up) or throughout?
+- **Effectiveness Correlation** — Which prompt style (question/imperative/statement) gets the fewest corrections? The best first-response acceptance rate? The lowest token cost? Use per_style_effectiveness data with specific numbers.
+- **Tool Scatter** — Does directive style lead to focused tool usage (low scatter = same files) or scattered (high scatter = many files)? Compare across prompt styles.
+- **Session Arc** — Does prompt length change over the session (first_quarter_avg vs last_quarter_avg)? Does the correction rate decrease over the session (warming_up flag)? What does this say about the user's rhythm?
+
 ### 3. Produce the Reflection
 
 Write a reflection that captures the methodology, not the content. Structure it as:
@@ -107,10 +116,16 @@ Write a reflection that captures the methodology, not the content. Structure it 
 2. **The Loop** — The user's iterative pattern this session
 3. **Key Prompting Patterns** — Specific phrases and behaviors with examples
 4. **Thinking Style** — How the user reasons and makes decisions
-5. **What Worked** — Moments where the collaboration was most productive
-6. **What Didn't** — Moments of friction, miscommunication, or wasted cycles
-7. **Session Economics** — Token usage, cache efficiency, cost-per-insight
-8. **Methodology Extract** — A concise, reusable description of this user's working style that could inform future sessions
+5. **Voice Analysis** — Quantitative language profile with citations:
+   - Top n-grams and what they reveal about communication habits
+   - Communication mode (questioner/commander/collaborator) with ratios
+   - Certainty profile (hedging vs assertive) with specific phrase counts
+   - Effectiveness correlation: which style worked best, with correction rates and token costs
+   - Session arc: prompt length trend and warming-up pattern
+6. **What Worked** — Moments where the collaboration was most productive
+7. **What Didn't** — Moments of friction, miscommunication, or wasted cycles
+8. **Session Economics** — Token usage, cache efficiency, cost-per-insight
+9. **Methodology Extract** — A concise, reusable description of this user's working style that could inform future sessions
 
 ### 4. Store and Present
 
