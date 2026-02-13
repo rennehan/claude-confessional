@@ -575,6 +575,48 @@ class TestGetTurnsSince:
         assert result["turn_count"] == 0
         assert result["turns"] == []
 
+    def test_includes_prompt_linguistics(self, tmp_path):
+        """get_turns_since includes prompt_linguistics key."""
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        _write_session(project_dir, "sess.jsonl", [
+            _queue_entry(timestamp=ts),
+            _user_entry("What is this?", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "It's a thing."}],
+                           timestamp=ts),
+        ])
+        result = get_turns_since("/tmp/project", _ts(5),
+                                transcript_dir=project_dir)
+        assert "prompt_linguistics" in result
+        assert result["prompt_linguistics"]["question_ratio"] == 1.0
+
+    def test_includes_effectiveness_signals(self, tmp_path):
+        """get_turns_since includes effectiveness_signals key."""
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        _write_session(project_dir, "sess.jsonl", [
+            _queue_entry(timestamp=ts),
+            _user_entry("Fix the bug", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "Fixed."}],
+                           timestamp=ts),
+            _user_entry("Add tests", uuid="u2", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "Done."}], uuid="a2",
+                           parent_uuid="u2", timestamp=ts),
+        ])
+        result = get_turns_since("/tmp/project", _ts(5),
+                                transcript_dir=project_dir)
+        assert "effectiveness_signals" in result
+        assert result["effectiveness_signals"]["eligible_turns"] == 1
+
+    def test_both_zeroed_when_no_turns(self, tmp_path):
+        """Both analytics zeroed when no turns match."""
+        result = get_turns_since("/tmp/project", _ts(5),
+                                transcript_dir=tmp_path / "nope")
+        assert result["prompt_linguistics"]["question_ratio"] == 0.0
+        assert result["effectiveness_signals"]["correction_rate"] == 0.0
+
 
 # --- Helper: turn dict builder ---
 
@@ -1172,6 +1214,27 @@ class TestCLI:
         data = json.loads(capsys.readouterr().out)
         assert data["turn_count"] == 1
         assert data["token_stats"]["total_input"] == 50
+        assert "prompt_linguistics" in data
+        assert "effectiveness_signals" in data
+
+    def test_cli_analyze_includes_analytics(self, tmp_path, monkeypatch, capsys):
+        """CLI analyze command includes both analytics keys."""
+        import transcript_reader as reader
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        _write_session(project_dir, "sess.jsonl", [
+            _queue_entry(timestamp=ts),
+            _user_entry("Fix the bug", timestamp=ts),
+            _assistant_entry([{"type": "text", "text": "Fixed."}], timestamp=ts),
+        ])
+        monkeypatch.setattr(reader, "get_transcript_dir", lambda cwd: project_dir)
+        monkeypatch.setattr("sys.argv",
+                          ["transcript_reader.py", "analyze", "/tmp/proj", _ts(10)])
+        reader.main()
+        data = json.loads(capsys.readouterr().out)
+        assert "prompt_linguistics" in data
+        assert "effectiveness_signals" in data
 
     def test_cli_unknown_command(self, monkeypatch):
         import transcript_reader as reader

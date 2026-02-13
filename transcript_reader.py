@@ -443,6 +443,8 @@ def get_turns_since(cwd: str, since_timestamp: str, transcript_dir=None) -> dict
             "total_cache_creation": total_cache_creation,
         },
         "sessions": session_summaries,
+        "prompt_linguistics": compute_prompt_linguistics(all_turns),
+        "effectiveness_signals": compute_effectiveness_signals(all_turns),
     }
 
 
@@ -795,6 +797,8 @@ def main():
             "tool_stats": result["tool_stats"],
             "token_stats": result["token_stats"],
             "session_count": len(result["sessions"]),
+            "prompt_linguistics": result["prompt_linguistics"],
+            "effectiveness_signals": result["effectiveness_signals"],
         }, indent=2))
     else:
         print(f"Unknown command: {command}")
