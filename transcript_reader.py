@@ -52,6 +52,11 @@ HEDGING_PHRASES = [
     "maybe", "perhaps", "i think", "not sure", "what if", "could we", "might",
 ]
 
+CORRECTION_MARKERS = [
+    "no,", "actually", "instead", "not what i", "i meant", "that's wrong",
+    "try again", "let me rephrase",
+]
+
 ASSERTIVE_PHRASES = [
     "must", "always", "definitely", "need to", "should", "have to",
     "make sure", "ensure",
@@ -612,6 +617,145 @@ def compute_prompt_linguistics(turns):
             "first_quarter_avg": statistics.mean(first_quarter),
             "middle_half_avg": statistics.mean(middle_half),
             "last_quarter_avg": statistics.mean(last_quarter),
+        },
+    }
+
+
+def _classify_prompt(prompt):
+    """Classify a prompt as question, imperative, or statement."""
+    if "?" in prompt:
+        return "question"
+    words = prompt.split()
+    if words and words[0].lower().strip(string.punctuation) in IMPERATIVE_VERBS:
+        return "imperative"
+    return "statement"
+
+
+def _is_correction(prompt):
+    """Check if a prompt contains correction markers."""
+    lower = prompt.lower()
+    return any(marker in lower for marker in CORRECTION_MARKERS)
+
+
+def _tool_scatter_for_turn(turn):
+    """Compute tool scatter for a single turn: unique_files / total_tools."""
+    tools = turn.get("tools", [])
+    if not tools:
+        return 0.0
+    files = set()
+    for t in tools:
+        f = t.get("files_touched", "")
+        if f:
+            files.add(f)
+    return len(files) / len(tools) if tools else 0.0
+
+
+def compute_effectiveness_signals(turns):
+    """Correlate prompt styles with outcomes.
+
+    Args:
+        turns: List of turn dicts (must have session_id field).
+
+    Returns:
+        Dict with correction_rate, per_style_effectiveness, tool_scatter,
+        first_response_acceptance, session_progression.
+    """
+    empty_style = {"count": 0, "correction_rate": 0.0, "avg_tool_count": 0.0, "avg_tokens": 0.0}
+    empty = {
+        "correction_rate": 0.0,
+        "corrections_total": 0,
+        "eligible_turns": 0,
+        "per_style_effectiveness": {
+            "question": dict(empty_style),
+            "imperative": dict(empty_style),
+            "statement": dict(empty_style),
+        },
+        "tool_scatter": {
+            "question": 0.0, "imperative": 0.0, "statement": 0.0, "overall": 0.0,
+        },
+        "first_response_acceptance": 1.0,
+        "session_progression": {
+            "first_half_correction_rate": 0.0,
+            "second_half_correction_rate": 0.0,
+            "warming_up": False,
+        },
+    }
+
+    if len(turns) < 2:
+        return empty
+
+    # Build eligible pairs: consecutive turns in the same session
+    pairs = []
+    for i in range(len(turns) - 1):
+        if turns[i].get("session_id") == turns[i + 1].get("session_id"):
+            corrected = _is_correction(turns[i + 1]["prompt"])
+            pairs.append((i, corrected))
+
+    if not pairs:
+        return empty
+
+    eligible = len(pairs)
+    corrections_total = sum(1 for _, c in pairs if c)
+    correction_rate = corrections_total / eligible
+
+    # Per-style tracking
+    style_data = {
+        "question": {"corrections": 0, "count": 0, "tool_counts": [], "token_totals": [], "scatters": []},
+        "imperative": {"corrections": 0, "count": 0, "tool_counts": [], "token_totals": [], "scatters": []},
+        "statement": {"corrections": 0, "count": 0, "tool_counts": [], "token_totals": [], "scatters": []},
+    }
+
+    for idx, corrected in pairs:
+        turn = turns[idx]
+        style = _classify_prompt(turn["prompt"])
+        sd = style_data[style]
+        sd["count"] += 1
+        if corrected:
+            sd["corrections"] += 1
+        sd["tool_counts"].append(len(turn.get("tools", [])))
+        m = turn.get("metrics", {})
+        sd["token_totals"].append(m.get("input_tokens", 0) + m.get("output_tokens", 0))
+        sd["scatters"].append(_tool_scatter_for_turn(turn))
+
+    per_style = {}
+    for style, sd in style_data.items():
+        if sd["count"] > 0:
+            per_style[style] = {
+                "count": sd["count"],
+                "correction_rate": sd["corrections"] / sd["count"],
+                "avg_tool_count": statistics.mean(sd["tool_counts"]),
+                "avg_tokens": statistics.mean(sd["token_totals"]),
+            }
+        else:
+            per_style[style] = dict(empty_style)
+
+    # Tool scatter per style and overall
+    all_scatters = []
+    tool_scatter = {}
+    for style, sd in style_data.items():
+        sc = sd["scatters"]
+        tool_scatter[style] = statistics.mean(sc) if sc else 0.0
+        all_scatters.extend(sc)
+    tool_scatter["overall"] = statistics.mean(all_scatters) if all_scatters else 0.0
+
+    # Session progression
+    mid = len(pairs) // 2
+    first_half = pairs[:mid] if mid > 0 else pairs
+    second_half = pairs[mid:] if mid > 0 else pairs
+    first_cr = sum(1 for _, c in first_half if c) / len(first_half) if first_half else 0.0
+    second_cr = sum(1 for _, c in second_half if c) / len(second_half) if second_half else 0.0
+
+    return {
+        "correction_rate": correction_rate,
+        "corrections_total": corrections_total,
+        "eligible_turns": eligible,
+        "per_style_effectiveness": per_style,
+        "tool_scatter": tool_scatter,
+        "first_response_acceptance": 1.0 - correction_rate,
+        "session_progression": {
+            "first_half_correction_rate": first_cr,
+            "second_half_correction_rate": second_cr,
+            "warming_up": first_cr > second_cr,
         },
     }
 

@@ -866,6 +866,247 @@ class TestComputePromptLinguistics:
 
 # --- Tests: CLI ---
 
+# --- Tests: compute_effectiveness_signals ---
+
+class TestComputeEffectivenessSignals:
+
+    def test_empty_turns(self):
+        from transcript_reader import compute_effectiveness_signals
+        result = compute_effectiveness_signals([])
+        assert result["correction_rate"] == 0.0
+        assert result["corrections_total"] == 0
+        assert result["eligible_turns"] == 0
+        assert result["first_response_acceptance"] == 1.0
+        for style in ("question", "imperative", "statement"):
+            assert result["per_style_effectiveness"][style]["count"] == 0
+
+    def test_single_turn_no_pairs(self):
+        from transcript_reader import compute_effectiveness_signals
+        result = compute_effectiveness_signals([_turn("Fix the bug")])
+        assert result["eligible_turns"] == 0
+        assert result["correction_rate"] == 0.0
+        assert result["first_response_acceptance"] == 1.0
+
+    def test_no_corrections(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),
+            _turn("Add some tests"),
+            _turn("Run the suite"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        assert result["eligible_turns"] == 2  # 2 consecutive pairs
+        assert result["corrections_total"] == 0
+        assert result["correction_rate"] == 0.0
+        assert result["first_response_acceptance"] == 1.0
+
+    def test_all_corrections(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),
+            _turn("No, actually fix it differently"),
+            _turn("Actually, try another approach"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        assert result["eligible_turns"] == 2
+        assert result["corrections_total"] == 2
+        assert result["correction_rate"] == 1.0
+        assert result["first_response_acceptance"] == 0.0
+
+    def test_mixed_corrections(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),
+            _turn("Actually, not that way"),  # correction
+            _turn("Now add tests"),
+            _turn("Run the suite"),  # not a correction
+        ]
+        result = compute_effectiveness_signals(turns)
+        assert result["eligible_turns"] == 3
+        assert result["corrections_total"] == 1
+
+    def test_correction_case_insensitive(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),
+            _turn("ACTUALLY do it this way"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        assert result["corrections_total"] == 1
+
+    def test_cross_session_boundary_skipped(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug", session_id="sess-1"),
+            _turn("Actually, not that", session_id="sess-2"),  # different session
+        ]
+        result = compute_effectiveness_signals(turns)
+        assert result["eligible_turns"] == 0
+        assert result["corrections_total"] == 0
+
+    def test_per_style_question(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("What is this bug?"),  # question
+            _turn("Add a test"),          # not a correction
+            _turn("How does this work?"), # question
+            _turn("Actually, I meant the other file"),  # correction
+        ]
+        result = compute_effectiveness_signals(turns)
+        pse = result["per_style_effectiveness"]
+        assert pse["question"]["count"] == 2
+        # First question → not corrected; second question → corrected
+        assert pse["question"]["correction_rate"] == 0.5
+
+    def test_per_style_imperative(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),    # imperative
+            _turn("Add some tests"), # imperative, not a correction
+            _turn("Run the suite"),  # imperative, not a correction
+        ]
+        result = compute_effectiveness_signals(turns)
+        pse = result["per_style_effectiveness"]
+        assert pse["imperative"]["count"] == 2  # first two are eligible
+        assert pse["imperative"]["correction_rate"] == 0.0
+
+    def test_per_style_statement(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("The code is broken"),   # statement
+            _turn("Actually, I was wrong"), # correction → statement corrected
+            _turn("The tests pass now"),    # statement
+        ]
+        result = compute_effectiveness_signals(turns)
+        pse = result["per_style_effectiveness"]
+        assert pse["statement"]["count"] == 2
+        assert pse["statement"]["correction_rate"] == 0.5
+
+    def test_per_style_avg_tool_count(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug", tools=[_tool("Read", "/a.py"), _tool("Edit", "/a.py")]),
+            _turn("Add tests"),  # not a correction
+        ]
+        result = compute_effectiveness_signals(turns)
+        pse = result["per_style_effectiveness"]
+        assert pse["imperative"]["avg_tool_count"] == 2.0  # "Fix" has 2 tools
+
+    def test_per_style_avg_tokens(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug", input_tokens=200, output_tokens=100),
+            _turn("Add tests", input_tokens=150, output_tokens=75),
+            _turn("Run the suite"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        pse = result["per_style_effectiveness"]
+        # Both "Fix" and "Add" are imperative, eligible
+        assert pse["imperative"]["avg_tokens"] == 262.5  # (300 + 225) / 2
+
+    def test_tool_scatter_focused(self):
+        from transcript_reader import compute_effectiveness_signals
+        # Same file touched by multiple tools → low scatter
+        turns = [
+            _turn("Fix it", tools=[
+                _tool("Read", "/a.py"), _tool("Edit", "/a.py"), _tool("Read", "/a.py"),
+            ]),
+            _turn("Done"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        # 1 unique file / 3 tool calls = 0.333...
+        assert abs(result["tool_scatter"]["imperative"] - 1/3) < 0.01
+
+    def test_tool_scatter_scattered(self):
+        from transcript_reader import compute_effectiveness_signals
+        # Different files each tool → high scatter
+        turns = [
+            _turn("Fix it", tools=[
+                _tool("Read", "/a.py"), _tool("Read", "/b.py"), _tool("Read", "/c.py"),
+            ]),
+            _turn("Done"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        # 3 unique files / 3 tool calls = 1.0
+        assert result["tool_scatter"]["imperative"] == 1.0
+
+    def test_tool_scatter_no_tools(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),
+            _turn("Thanks"),
+        ]
+        result = compute_effectiveness_signals(turns)
+        assert result["tool_scatter"]["overall"] == 0.0
+
+    def test_first_response_acceptance(self):
+        from transcript_reader import compute_effectiveness_signals
+        turns = [
+            _turn("Fix the bug"),
+            _turn("Actually, wrong approach"),  # correction
+            _turn("Now add tests"),
+            _turn("Run them"),  # not a correction
+            _turn("Deploy it"),
+            _turn("Instead, just push"),  # correction
+        ]
+        result = compute_effectiveness_signals(turns)
+        # 5 eligible pairs, 2 corrections
+        assert result["correction_rate"] == 2 / 5
+        assert result["first_response_acceptance"] == 1.0 - 2 / 5
+
+    def test_session_progression_warming_up(self):
+        from transcript_reader import compute_effectiveness_signals
+        # First half: corrections. Second half: no corrections.
+        turns = [
+            _turn("Do A"),
+            _turn("No, actually do B"),   # correction (pair 1)
+            _turn("Do C"),
+            _turn("Not what I meant"),    # correction (pair 2)
+            _turn("Do E"),
+            _turn("Do F"),               # not a correction (pair 3)
+            _turn("Do G"),
+            _turn("Do H"),               # not a correction (pair 4)
+        ]
+        result = compute_effectiveness_signals(turns)
+        sp = result["session_progression"]
+        assert sp["first_half_correction_rate"] > sp["second_half_correction_rate"]
+        assert sp["warming_up"] is True
+
+    def test_session_progression_no_warmup(self):
+        from transcript_reader import compute_effectiveness_signals
+        # Second half has more corrections
+        turns = [
+            _turn("Do A"),
+            _turn("Do B"),                # not correction (pair 1)
+            _turn("Do C"),
+            _turn("Do D"),                # not correction (pair 2)
+            _turn("Do E"),
+            _turn("Actually, wrong"),     # correction (pair 3)
+            _turn("Do G"),
+            _turn("No, I meant this"),    # correction (pair 4)
+        ]
+        result = compute_effectiveness_signals(turns)
+        sp = result["session_progression"]
+        assert sp["first_half_correction_rate"] <= sp["second_half_correction_rate"]
+        assert sp["warming_up"] is False
+
+    def test_session_progression_equal(self):
+        from transcript_reader import compute_effectiveness_signals
+        # 5 turns → 4 pairs, split 2/2
+        # Pair 0: corrected, pair 1: not, pair 2: corrected, pair 3: not
+        turns = [
+            _turn("Do A"),
+            _turn("Actually, fix it"),   # correction (pair 0)
+            _turn("Do C"),               # not correction (pair 1)
+            _turn("Actually, fix it"),   # correction (pair 2)
+            _turn("Do E"),               # not correction (pair 3)
+        ]
+        result = compute_effectiveness_signals(turns)
+        sp = result["session_progression"]
+        assert sp["first_half_correction_rate"] == sp["second_half_correction_rate"]
+        assert sp["warming_up"] is False  # equal is not warming up
+
+
 class TestCLI:
     """Test the main() CLI interface via monkeypatching."""
 
