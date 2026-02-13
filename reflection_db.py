@@ -12,6 +12,7 @@ from pathlib import Path
 
 DB_DIR = Path.home() / ".reflection"
 DB_PATH = DB_DIR / "history.db"
+VERBOSE = False
 
 
 def get_connection():
@@ -151,9 +152,11 @@ def cmd_init(project):
             (project, now_iso(), "Initial breakpoint")
         )
         conn.commit()
-        print("Initialized reflection DB with first breakpoint.")
+        if VERBOSE:
+            print("Initialized reflection DB with first breakpoint.")
     else:
-        print("Reflection DB already initialized.")
+        if VERBOSE:
+            print("Reflection DB already initialized.")
     conn.close()
 
 
@@ -170,7 +173,10 @@ def cmd_record_prompt(project, prompt_text):
     prompt_id = cursor.lastrowid
     conn.commit()
     conn.close()
-    print(json.dumps({"prompt_id": prompt_id}))
+    if VERBOSE:
+        print(json.dumps({"prompt_id": prompt_id}))
+    else:
+        print(prompt_id)
 
 
 def cmd_record_response(project, prompt_id, response_text):
@@ -185,7 +191,8 @@ def cmd_record_response(project, prompt_id, response_text):
     )
     conn.commit()
     conn.close()
-    print("Response recorded.")
+    if VERBOSE:
+        print("Response recorded.")
 
 
 def cmd_breakpoint(project, note=""):
@@ -313,7 +320,8 @@ def cmd_store_reflection(project, reflection_text, git_summary="", prompt_count=
     )
     conn.commit()
     conn.close()
-    print("Reflection stored.")
+    if VERBOSE:
+        print("Reflection stored.")
 
 
 def cmd_get_reflections(project):
@@ -365,7 +373,8 @@ def cmd_record_session_context(project, model="", git_branch="", git_commit="", 
     )
     conn.commit()
     conn.close()
-    print("Session context recorded.")
+    if VERBOSE:
+        print("Session context recorded.")
 
 
 def cmd_record_tool(project, prompt_id, tool_name, tool_input_summary="", files_touched="",
@@ -383,7 +392,64 @@ def cmd_record_tool(project, prompt_id, tool_name, tool_input_summary="", files_
     )
     conn.commit()
     conn.close()
-    print("Tool usage recorded.")
+    if VERBOSE:
+        print("Tool usage recorded.")
+
+
+def cmd_record_interaction(project, json_text):
+    """Record a complete interaction: prompt + tools + response in one batch."""
+    init_db()
+    conn = get_connection()
+
+    try:
+        data = json.loads(json_text)
+    except json.JSONDecodeError as e:
+        print(json.dumps({"error": f"Invalid JSON: {e}"}), file=sys.stderr)
+        sys.exit(1)
+
+    bp = get_current_breakpoint(conn, project)
+    bp_id = bp["id"] if bp else None
+    ts = now_iso()
+
+    # 1. Insert prompt
+    cursor = conn.execute(
+        "INSERT INTO prompts (project, breakpoint_id, timestamp, prompt) VALUES (?, ?, ?, ?)",
+        (project, bp_id, ts, data.get("prompt", ""))
+    )
+    prompt_id = cursor.lastrowid
+
+    # 2. Insert tool usage
+    for tool in data.get("tools", []):
+        conn.execute(
+            """INSERT INTO tool_usage
+               (prompt_id, project, timestamp, tool_name, tool_input_summary, files_touched,
+                is_subagent, subagent_task, subagent_result_summary, duration_ms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                prompt_id, project, ts,
+                tool.get("tool_name", ""),
+                tool.get("input_summary", ""),
+                tool.get("files_touched", ""),
+                1 if tool.get("is_subagent", False) else 0,
+                tool.get("subagent_task", ""),
+                tool.get("subagent_result_summary", ""),
+                safe_int(tool.get("duration_ms", 0))
+            )
+        )
+
+    # 3. Insert response
+    conn.execute(
+        "INSERT INTO responses (prompt_id, project, breakpoint_id, timestamp, response) VALUES (?, ?, ?, ?, ?)",
+        (prompt_id, project, bp_id, ts, data.get("response", ""))
+    )
+
+    conn.commit()
+    conn.close()
+
+    if VERBOSE:
+        print(json.dumps({"prompt_id": prompt_id}))
+    else:
+        print(prompt_id)
 
 
 def cmd_get_tools_since_breakpoint(project):
@@ -432,19 +498,22 @@ def cmd_get_session_context(project):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: reflection_db.py <command> <project> [args...] [--stdin]")
+        print("Usage: reflection_db.py <command> <project> [args...] [--stdin] [--verbose]")
         print("Commands: init, record_prompt, record_response, breakpoint, get_window,")
         print("          get_all_since_breakpoint, store_reflection, get_reflections, stats,")
         print("          record_session_context, record_tool, get_tools_since_breakpoint,")
-        print("          get_session_context")
+        print("          get_session_context, record_interaction")
         print()
         print("Use --stdin to read the primary text payload from stdin instead of argv.")
         print("This avoids shell escaping issues with quotes, newlines, and special characters.")
+        print("Use --verbose to print confirmation messages for mutation commands.")
         sys.exit(1)
 
-    # Strip --stdin flag from argv, note whether it was present
+    # Strip flags from argv, note whether they were present
     use_stdin = "--stdin" in sys.argv
     argv = [a for a in sys.argv if a != "--stdin"]
+    VERBOSE = "--verbose" in argv
+    argv = [a for a in argv if a != "--verbose"]
 
     command = argv[1]
     project = argv[2]
@@ -520,6 +589,9 @@ if __name__ == "__main__":
                 subagent_result_summary=arg(9, ""),
                 duration_ms=arg(10, 0)
             )
+    elif command == "record_interaction":
+        interaction_text = stdin_text if use_stdin else arg(3)
+        cmd_record_interaction(project, interaction_text)
     elif command == "get_tools_since_breakpoint":
         cmd_get_tools_since_breakpoint(project)
     elif command == "get_session_context":

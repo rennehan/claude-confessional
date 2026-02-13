@@ -15,10 +15,10 @@ Welcome to the Church of Claude. Please be seated.
 mkdir -p ~/.claude/commands ~/.claude/scripts
 
 # Install the holy texts
-cp commands/record.md ~/.claude/commands/
-cp commands/breakpoint.md ~/.claude/commands/
-cp commands/reflect.md ~/.claude/commands/
-cp scripts/reflection_db.py ~/.claude/scripts/
+cp record.md ~/.claude/commands/
+cp breakpoint.md ~/.claude/commands/
+cp reflect.md ~/.claude/commands/
+cp reflection_db.py ~/.claude/scripts/
 chmod +x ~/.claude/scripts/reflection_db.py
 ```
 
@@ -91,9 +91,9 @@ Or at least feel smug about them.
 If you've truly converted, you can install the meme aliases alongside the standard commands:
 
 ```bash
-cp commands/confess.md ~/.claude/commands/
-cp commands/amen.md ~/.claude/commands/
-cp commands/sermon.md ~/.claude/commands/
+cp confess.md ~/.claude/commands/
+cp amen.md ~/.claude/commands/
+cp sermon.md ~/.claude/commands/
 ```
 
 Then your ritual becomes:
