@@ -15,7 +15,7 @@
 ## Data Model
 
 - [x] **Add sequence ordering to tool calls and response blocks** — Implemented via turn_blocks table with sequence column; get_turn_blocks retrieves ordered blocks grouped by prompt_id
-- [ ] **Revisit breakpoint semantics** — If a user never calls `/breakpoint`, reflections span unbounded time; consider auto-breakpoints on session boundaries (SessionStart hook) or a time-based heuristic
+- [x] **Revisit breakpoint semantics** — Auto-breakpoint created on SessionStart when last breakpoint is >4 hours old; prevents unbounded reflection windows
 
 ## Reflection Quality
 

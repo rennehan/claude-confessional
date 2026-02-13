@@ -17,6 +17,7 @@ import json
 import os
 import logging
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import OrderedDict
 
@@ -292,6 +293,16 @@ def handle_session_start(input_data):
 
     try:
         db.cmd_init(project)
+
+        # Auto-breakpoint if last one is stale (>4 hours old)
+        conn = db.get_connection()
+        bp = db.get_current_breakpoint(conn, project)
+        if bp:
+            bp_time = datetime.fromisoformat(bp["timestamp"])
+            age_seconds = (datetime.now(timezone.utc) - bp_time).total_seconds()
+            if age_seconds > 4 * 3600:
+                db.cmd_breakpoint(project, "Auto-breakpoint: new session")
+        conn.close()
 
         git_branch = ""
         git_commit = ""
