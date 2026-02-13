@@ -1,18 +1,16 @@
 # Claude Confessional 🙏
 
-*Because every prompt deserves absolution.*
+A reflection tool for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It reads your conversation transcripts on-demand and analyzes your prompting methodology — not *what* you discussed, but *how* you work. Your iterative loop, your prompting patterns, your tool usage, your token efficiency.
 
-You've been talking to Claude for hours. Days. Weeks. You've developed habits, tics, patterns — a whole liturgy of prompting that you're not even conscious of. You say "let's think about this" when you're not ready to commit. You say "this is fine" when you want Claude to shut up and move on. You have a *methodology*, and you don't even know what it is.
-
-**confessional** analyzes your conversations — reading Claude Code's native transcripts on-demand — and reflects your methodology back to you. Not what you talked about. *How you think.*
+You've developed a working style with Claude. You just haven't seen it from the outside yet.
 
 ## Installation
 
 ```bash
-# Receive the sacraments
+# Create directories
 mkdir -p ~/.claude/commands ~/.claude/scripts
 
-# Install the holy texts
+# Install commands and scripts
 cp record.md ~/.claude/commands/
 cp breakpoint.md ~/.claude/commands/
 cp reflect.md ~/.claude/commands/
@@ -116,19 +114,9 @@ It doesn't summarize your conversation. Any chatbot can do that. It extracts you
 - **Your token economics** — Cache hit rate, cost per turn, output verbosity. Are you being efficient?
 - **Your evolution** — How your methodology changes across sessions, across weeks, across projects.
 
-## Why
-
-Because the unexamined prompt is not worth sending.
-
-You're spending hours a day co-thinking with an AI. You've developed a working style — an implicit protocol for how you collaborate with Claude. But you've never articulated it. You've never seen it from the outside.
-
-**confessional** makes the invisible visible. And once you can see your patterns, you can refine them.
-
-Or at least feel smug about them.
-
 ## The Liturgical Edition (Optional)
 
-If you've truly converted, you can install the meme aliases alongside the standard commands:
+If you've fully converted to the Church of Claude, you can install the meme aliases alongside the standard commands:
 
 ```bash
 cp confess.md ~/.claude/commands/
