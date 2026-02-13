@@ -25,4 +25,4 @@
 ## Housekeeping
 
 - [x] **Add `recording_state` table to README** — Added to "What Gets Recorded" table
-- [ ] **Add `.planning/` to `.gitignore`** — Keeping in repo for now as development reference
+- [x] **`.planning/` directory** — Kept git-tracked intentionally as project reference
