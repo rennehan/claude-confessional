@@ -317,6 +317,7 @@ def parse_session(path) -> dict:
                 "stop_reason": stop_reason,
             },
             "timestamp": turn_timestamp,
+            "session_id": session_id,
         })
 
     return {

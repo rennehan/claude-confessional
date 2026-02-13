@@ -213,6 +213,17 @@ class TestParseSession:
         assert "Hello! How can I help?" in turn["response"]
         assert turn["tools"] == []
 
+    def test_turn_has_session_id(self, tmp_path):
+        """Each turn carries the session's session_id."""
+        path = _write_session(tmp_path, "sess.jsonl", [
+            _queue_entry("my-session"),
+            _user_entry("Hello", session_id="my-session"),
+            _assistant_entry([{"type": "text", "text": "Hi"}],
+                           session_id="my-session"),
+        ])
+        result = parse_session(path)
+        assert result["turns"][0]["session_id"] == "my-session"
+
     def test_multi_turn(self, tmp_path):
         """Extracts multiple turns from a session."""
         path = _write_session(tmp_path, "sess.jsonl", [
