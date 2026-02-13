@@ -64,6 +64,19 @@ def _extract_user_prompt_text(entry):
     content = entry.get("message", {}).get("content", "")
     if isinstance(content, str):
         return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+                elif block.get("type") == "tool_result":
+                    continue
+                elif block.get("type") == "image":
+                    parts.append("[image]")
+            elif isinstance(block, str):
+                parts.append(block)
+        return "\n".join(parts) if parts else ""
     return ""
 
 
@@ -121,7 +134,8 @@ def parse_last_turn(transcript_path):
                 except json.JSONDecodeError:
                     continue
 
-    # Find the last real user prompt (string content, not tool_result)
+    # Find the last real user prompt (string content or structured content
+    # that isn't purely tool_result blocks)
     last_user_idx = None
     for i in range(len(lines) - 1, -1, -1):
         entry = lines[i]
@@ -130,6 +144,16 @@ def parse_last_turn(transcript_path):
             if isinstance(content, str) and content.strip():
                 last_user_idx = i
                 break
+            if isinstance(content, list):
+                # If all blocks are tool_result, this is a tool cycle, not a prompt
+                has_non_tool_result = any(
+                    (isinstance(b, dict) and b.get("type") != "tool_result")
+                    or isinstance(b, str)
+                    for b in content
+                )
+                if has_non_tool_result:
+                    last_user_idx = i
+                    break
 
     if last_user_idx is None:
         return None
