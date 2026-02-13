@@ -1,0 +1,112 @@
+# claude-confessional 🙏
+
+*Because every prompt deserves absolution.*
+
+You've been talking to Claude for hours. Days. Weeks. You've developed habits, tics, patterns — a whole liturgy of prompting that you're not even conscious of. You say "let's think about this" when you're not ready to commit. You say "this is fine" when you want Claude to shut up and move on. You have a *methodology*, and you don't even know what it is.
+
+**confessional** records everything — your prompts, Claude's responses, every tool call, every sub-agent spawn — and then reflects it back to you. Not what you talked about. *How you think.*
+
+Welcome to the Church of Claude. Please be seated.
+
+## Installation
+
+```bash
+# Receive the sacraments
+mkdir -p ~/.claude/commands ~/.claude/scripts
+
+# Install the holy texts
+cp commands/record.md ~/.claude/commands/
+cp commands/breakpoint.md ~/.claude/commands/
+cp commands/reflect.md ~/.claude/commands/
+cp scripts/reflection_db.py ~/.claude/scripts/
+chmod +x ~/.claude/scripts/reflection_db.py
+```
+
+## The Sacred Ritual
+
+### `/record` — Begin Confession
+
+Start recording. Every prompt you utter and every response Claude gives is written to the eternal ledger at `~/.reflection/history.db`. Tool calls, sub-agent spawns, session context — all of it. Claude works normally, but now God is watching.
+
+### `/breakpoint` — Say Your Amen
+
+Mark the end of a work session. Optionally attach a note for the historical record:
+
+```
+/breakpoint Mass is over. We built a knowledge graph.
+```
+
+### `/reflect` — Receive Your Sermon
+
+Claude examines your sins — every prompt, response, tool call, and git commit since the last breakpoint — and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
+
+Reflections accumulate. Over time, Claude can trace the evolution of your methodology. You're not just building software. You're building a doctrine.
+
+## The Loop
+
+```
+/record          ← enter the confessional
+  ... work ...
+/breakpoint      ← say amen
+/reflect         ← receive your sermon
+/record          ← return for more penance
+  ... work ...
+```
+
+## What Gets Recorded
+
+| Table | The Sacred Record |
+|-------|-------------------|
+| `breakpoints` | Session boundaries — where one mass ends and another begins |
+| `prompts` | Every word you speak to Claude, timestamped for eternity |
+| `responses` | Every word Claude speaks back, in full |
+| `tool_usage` | Every tool call, file touch, and sub-agent spawn |
+| `session_context` | Model, git branch, MCP servers, CLAUDE.md hash |
+| `reflections` | The sermons — Claude's analysis of your methodology |
+
+Everything lives in `~/.reflection/history.db` (SQLite). Portable, queryable, and ready for the afterlife.
+
+## What `/reflect` Actually Does
+
+It doesn't summarize your conversation. Any chatbot can do that. It extracts your **methodology**:
+
+- **Your loop** — Do you think first then build, or build first then think? How many rounds of discussion before you commit?
+- **Your language** — What phrases signal intent? When you say "what about X?" do you mean "do X" or "I'm exploring"?
+- **Your corrections** — When do you push back? What triggers a redirect?
+- **Your tool patterns** — Heavy on file reads = exploring. Heavy on writes = building. Heavy on bash = debugging. The tools tell the truth.
+- **Your evolution** — How your methodology changes across sessions, across weeks, across projects.
+
+## Why
+
+Because the unexamined prompt is not worth sending.
+
+You're spending hours a day co-thinking with an AI. You've developed a working style — an implicit protocol for how you collaborate with Claude. But you've never articulated it. You've never seen it from the outside.
+
+**confessional** makes the invisible visible. And once you can see your patterns, you can refine them.
+
+Or at least feel smug about them.
+
+## The Liturgical Edition (Optional)
+
+If you've truly converted, you can install the meme aliases alongside the standard commands:
+
+```bash
+cp commands/confess.md ~/.claude/commands/
+cp commands/amen.md ~/.claude/commands/
+cp commands/sermon.md ~/.claude/commands/
+```
+
+Then your ritual becomes:
+
+```
+/confess         ← kneel and begin
+  ... work ...
+/amen            ← close the prayer
+/sermon          ← receive the word
+```
+
+Same functionality, more piety. Both sets can coexist — use whichever matches your current level of devotion.
+
+## License
+
+MIT.
