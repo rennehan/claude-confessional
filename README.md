@@ -1,8 +1,17 @@
 # Claude Confessional 🙏
 
-A reflection tool for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It reads your conversation transcripts on-demand and analyzes your prompting methodology — not *what* you discussed, but *how* you work. Your iterative loop, your prompting patterns, your tool usage, your token efficiency.
+A methodology reflection tool for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-You've developed a working style with Claude. You just haven't seen it from the outside yet.
+Claude Code ships with [`/insights`](https://www.zolkos.com/2026/02/04/deep-dive-how-claude-codes-insights-command-works.html) — a dashboard that aggregates your usage over 30 days: tool frequency, friction points, feature adoption. It tells you *what* you're doing. **confessional** is the complement: it analyzes *how* you think. Your iterative loop, your prompting language, your decision patterns, your collaboration dynamic with Claude — extracted per-session from the native transcripts and tracked over time.
+
+| | `/insights` | `/reflect` |
+|---|---|---|
+| **Scope** | 30-day aggregate across all projects | Per-session, between breakpoints you define |
+| **Output** | HTML dashboard with charts and stats | Structured text reflection, stored as JSONL |
+| **Focus** | Tool usage, friction points, feature adoption | Prompting methodology, voice analysis, prompt effectiveness |
+| **Data** | Usage statistics, code metrics | Turn-level analysis: prompts, responses, linguistic patterns, correction rates |
+| **Tracking** | Snapshot — regenerate to see changes | Cumulative — reflections build a methodology history |
+| **Control** | Fixed 30-day window | You choose when to mark boundaries and reflect |
 
 ## Installation
 
@@ -42,7 +51,7 @@ Everything is plain text. No SQL. No database. Just JSON and JSONL files you can
 | Module | Purpose |
 |--------|---------|
 | `confessional_store.py` | Breakpoints, reflections, recording state (JSON/JSONL I/O) |
-| `transcript_reader.py` | Reads native JSONL transcripts, extracts turns/tools/metrics |
+| `transcript_reader.py` | Reads native JSONL transcripts, extracts turns/tools/metrics, computes prompt linguistics and effectiveness signals |
 | `confessional_hook.py` | SessionStart hook only (auto-breakpoints when sessions are >4h apart) |
 
 A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no tokens spent on bookkeeping.
@@ -113,6 +122,16 @@ It doesn't summarize your conversation. Any chatbot can do that. It extracts you
 - **Your tool patterns** — Heavy on file reads = exploring. Heavy on writes = building. Heavy on bash = debugging. The tools tell the truth.
 - **Your token economics** — Cache hit rate, cost per turn, output verbosity. Are you being efficient?
 - **Your evolution** — How your methodology changes across sessions, across weeks, across projects.
+
+### Voice Analysis
+
+Each reflection includes a quantitative linguistic analysis of your prompts:
+
+- **Signature phrases** — Your most frequent bigrams and trigrams, extracted and ranked. Repeated patterns like "for example", "make sure", or "what if" reveal your communication habits.
+- **Communication mode** — Question ratio, imperative ratio, and agency framing (I/we/you/let's). Are you a questioner, a commander, or a collaborator?
+- **Certainty profile** — Hedging phrases ("maybe", "I think", "not sure") vs assertive phrases ("must", "ensure", "need to"). When are you confident vs exploratory?
+- **Effectiveness correlation** — Which prompt style (question, imperative, statement) gets the fewest corrections? The lowest token cost? The best first-response acceptance rate?
+- **Session arc** — How your prompt length and correction rate change over a session. Do you warm up, or do you start strong and fatigue?
 
 ## The Liturgical Edition (Optional)
 
