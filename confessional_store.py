@@ -131,6 +131,7 @@ def store_reflection(project, reflection_text, git_summary="", prompt_count=0):
     entry = {
         "id": new_id,
         "timestamp": _now_iso(),
+        "breakpoint_id": current_bp["id"] if current_bp else None,
         "breakpoint_start": previous_bp["timestamp"] if previous_bp else None,
         "breakpoint_end": current_bp["timestamp"] if current_bp else None,
         "reflection": reflection_text,
@@ -149,6 +150,31 @@ def get_reflections(project):
 def get_reflections_summary(project):
     """Get reflections with metadata (for cross-session comparison)."""
     return _read_jsonl(_project_dir(project) / "reflections.jsonl")
+
+
+# --- Dashboard Manifest ---
+
+def _dashboards_dir(project):
+    """Get the dashboards directory for a project."""
+    return _project_dir(project) / "dashboards"
+
+
+def append_dashboard_manifest(project, breakpoint_id, reflection_id, html_path):
+    """Append a dashboard entry to the manifest. Returns the entry dict."""
+    manifest_path = _dashboards_dir(project) / "manifest.jsonl"
+    entry = {
+        "breakpoint_id": breakpoint_id,
+        "reflection_id": reflection_id,
+        "html_path": str(html_path),
+        "generated_at": _now_iso(),
+    }
+    _append_jsonl(manifest_path, entry)
+    return entry
+
+
+def get_dashboard_manifest(project):
+    """Read all dashboard manifest entries for a project."""
+    return _read_jsonl(_dashboards_dir(project) / "manifest.jsonl")
 
 
 # --- Recording State ---
@@ -255,6 +281,15 @@ def main():
     elif command == "is_recording":
         enabled = is_recording(project)
         print(json.dumps({"project": project, "recording": enabled}))
+
+    elif command == "append_dashboard_manifest":
+        entry = append_dashboard_manifest(
+            project, int(arg(3)), int(arg(4)), arg(5))
+        print(json.dumps(entry))
+
+    elif command == "get_dashboard_manifest":
+        manifest = get_dashboard_manifest(project)
+        print(json.dumps(manifest, indent=2))
 
     else:
         print(f"Unknown command: {command}")

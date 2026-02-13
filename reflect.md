@@ -148,3 +148,27 @@ If previous reflections exist, also include a **Methodology Evolution** section:
 - What has the user learned about their own working style?
 
 Present the full reflection to the user.
+
+### 5. Generate Dashboards
+
+Generate the session HTML dashboard using the transcript analysis data gathered in Step 1. Pass the analysis data, breakpoint, and reflection metadata via stdin as JSON:
+
+```bash
+python3 ~/.claude/scripts/dashboard_generator.py session "$PROJECT" "<breakpoint_id>" --stdin <<'DASHBOARD_EOF'
+{"analysis": <analysis_json>, "breakpoint": <breakpoint_json>, "reflection": {"id": <reflection_id>, "timestamp": "<timestamp>"}}
+DASHBOARD_EOF
+```
+
+Record the dashboard in the manifest:
+```bash
+python3 ~/.claude/scripts/confessional_store.py append_dashboard_manifest "$PROJECT" <breakpoint_id> <reflection_id> "<html_path>"
+```
+
+Regenerate the master index:
+```bash
+python3 ~/.claude/scripts/dashboard_generator.py index "$PROJECT"
+```
+
+Report the dashboard paths to the user:
+- Session dashboard: `<session_html_path>`
+- Master index: `<index_html_path>`

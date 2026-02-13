@@ -202,6 +202,47 @@ class TestReflections:
         assert summary[0]["prompt_count"] == 20
         assert "timestamp" in summary[0]
 
+    def test_store_reflection_includes_breakpoint_id(self, project):
+        store.add_breakpoint(project, "start")
+        store.add_breakpoint(project, "end")
+        ref = store.store_reflection(project, "Reflection text", "2 commits", 10)
+        assert ref["breakpoint_id"] == 2  # current breakpoint id
+
+    def test_store_reflection_breakpoint_id_none_when_no_breakpoints(self, project):
+        ref = store.store_reflection(project, "Orphan reflection")
+        assert ref["breakpoint_id"] is None
+
+
+# --- Tests: Dashboard Manifest ---
+
+class TestDashboardManifest:
+
+    def test_get_dashboard_manifest_empty(self, project):
+        assert store.get_dashboard_manifest(project) == []
+
+    def test_append_dashboard_manifest(self, project):
+        entry = store.append_dashboard_manifest(project, 3, 1, "/path/to/session-3.html")
+        assert entry["breakpoint_id"] == 3
+        assert entry["reflection_id"] == 1
+        assert entry["html_path"] == "/path/to/session-3.html"
+        assert "generated_at" in entry
+        manifest = store.get_dashboard_manifest(project)
+        assert len(manifest) == 1
+        assert manifest[0]["breakpoint_id"] == 3
+
+    def test_append_dashboard_manifest_multiple(self, project):
+        store.append_dashboard_manifest(project, 2, 1, "/path/session-2.html")
+        store.append_dashboard_manifest(project, 3, 2, "/path/session-3.html")
+        manifest = store.get_dashboard_manifest(project)
+        assert len(manifest) == 2
+        assert manifest[0]["breakpoint_id"] == 2
+        assert manifest[1]["breakpoint_id"] == 3
+
+    def test_dashboards_dir_created(self, project, tmp_path):
+        store.append_dashboard_manifest(project, 1, 1, "/path/session-1.html")
+        dashboards_dir = tmp_path / "projects" / project / "dashboards"
+        assert dashboards_dir.exists()
+
 
 # --- Tests: Recording State ---
 
@@ -341,6 +382,24 @@ class TestCLI:
         store.main()
         data = json.loads(capsys.readouterr().out)
         assert data["recording"] is False
+
+    def test_cli_append_dashboard_manifest(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "append_dashboard_manifest",
+                           project, "3", "1", "/path/session-3.html"])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["breakpoint_id"] == 3
+        assert data["reflection_id"] == 1
+
+    def test_cli_get_dashboard_manifest(self, monkeypatch, capsys, project):
+        store.append_dashboard_manifest(project, 2, 1, "/path/session-2.html")
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_dashboard_manifest", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert len(data) == 1
+        assert data[0]["breakpoint_id"] == 2
 
     def test_cli_unknown_command(self, monkeypatch, project):
         monkeypatch.setattr("sys.argv",

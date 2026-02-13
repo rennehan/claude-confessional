@@ -13,7 +13,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.coverage.run]
-source = ["confessional_store", "transcript_reader", "confessional_hook"]
+source = ["confessional_store", "transcript_reader", "confessional_hook", "dashboard_generator"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

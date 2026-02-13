@@ -30,9 +30,19 @@
 - [x] **Voice Analysis in reflect.md / sermon.md** — Signature phrases, communication mode, certainty profile, effectiveness correlation, tool scatter, session arc
 - [x] **Smoke tests updated** — `compute_prompt_linguistics` and `compute_effectiveness_signals` importable
 
+## HTML Dashboard (Completed)
+
+- [x] **`breakpoint_id` on reflections** — Explicit link between reflections and the breakpoint they cover (backward-compatible)
+- [x] **Dashboard manifest** — `dashboards/manifest.jsonl` tracks generated HTML files per project
+- [x] **`dashboard_generator.py`** — Pure-CSS HTML renderer: session dashboards with bar charts, summary cards, tables; master index with breakpoint/reflection status (28 tests)
+- [x] **Session dashboard** — Self-contained HTML per reflection: tool usage, prompt effectiveness, voice profile, session arc, n-grams, token breakdown
+- [x] **Master index** — `index.html` listing all breakpoints with reflection status and links to session dashboards
+- [x] **Integrated into `/reflect`** — Dashboard generation is Step 5 of the reflect workflow, no separate command
+- [x] **Smoke tests updated** — `dashboard_generator` importable with key functions
+
 ## Future
 
 - [ ] **Migration tool** — Script to migrate existing SQLite data to JSONL (for users upgrading from v1)
 - [ ] **Token budget tracking** — Track cumulative token spend per project across reflections
 - [ ] **Reflection diffing** — Compare methodology across reflections to surface evolution patterns
-- [ ] **Multi-project dashboard** — Aggregate patterns across projects
+- [ ] **Multi-project dashboard** — Aggregate patterns across projects (extend dashboard_generator.py)

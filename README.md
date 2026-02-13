@@ -7,7 +7,7 @@ Claude Code ships with [`/insights`](https://www.zolkos.com/2026/02/04/deep-dive
 | | `/insights` | `/reflect` |
 |---|---|---|
 | **Scope** | 30-day aggregate across all projects | Per-session, between breakpoints you define |
-| **Output** | HTML dashboard with charts and stats | Structured text reflection, stored as JSONL |
+| **Output** | HTML dashboard with charts and stats | Text reflection + HTML dashboard, stored as JSONL + HTML |
 | **Focus** | Tool usage, friction points, feature adoption | Prompting methodology, voice analysis, prompt effectiveness |
 | **Data** | Usage statistics, code metrics | Turn-level analysis: prompts, responses, linguistic patterns, correction rates |
 | **Tracking** | Snapshot — regenerate to see changes | Cumulative — reflections build a methodology history |
@@ -26,7 +26,8 @@ cp reflect.md ~/.claude/commands/
 cp confessional_store.py ~/.claude/scripts/
 cp transcript_reader.py ~/.claude/scripts/
 cp confessional_hook.py ~/.claude/scripts/
-chmod +x ~/.claude/scripts/confessional_store.py ~/.claude/scripts/transcript_reader.py ~/.claude/scripts/confessional_hook.py
+cp dashboard_generator.py ~/.claude/scripts/
+chmod +x ~/.claude/scripts/confessional_store.py ~/.claude/scripts/transcript_reader.py ~/.claude/scripts/confessional_hook.py ~/.claude/scripts/dashboard_generator.py
 
 # Register the system hooks
 python3 ~/.claude/scripts/confessional_hook.py --install
@@ -50,9 +51,10 @@ Everything is plain text. No SQL. No database. Just JSON and JSONL files you can
 
 | Module | Purpose |
 |--------|---------|
-| `confessional_store.py` | Breakpoints, reflections, recording state (JSON/JSONL I/O) |
+| `confessional_store.py` | Breakpoints, reflections, recording state, dashboard manifest (JSON/JSONL I/O) |
 | `transcript_reader.py` | Reads native JSONL transcripts, extracts turns/tools/metrics, computes prompt linguistics and effectiveness signals |
 | `confessional_hook.py` | SessionStart hook only (auto-breakpoints when sessions are >4h apart) |
+| `dashboard_generator.py` | Pure-CSS HTML dashboards: per-session visualizations and master index |
 
 A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no tokens spent on bookkeeping.
 
@@ -78,6 +80,8 @@ Claude reads every prompt, response, tool call, and git commit since the last br
 
 The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
 
+Each reflection also generates an **HTML dashboard** — a self-contained, pure-CSS visualization of your session data. Open it in any browser. No JavaScript, no CDN, no network requests. The master index at `~/.reflection/projects/<project>/dashboards/index.html` lists all breakpoints and links to reflected sessions.
+
 Reflections accumulate. Over time, Claude can trace the evolution of your methodology.
 
 ## The Loop
@@ -98,8 +102,11 @@ Reflections accumulate. Over time, Claude can trace the evolution of your method
 | `breakpoints.jsonl` | Session boundaries with timestamps and notes |
 | `reflections.jsonl` | Methodology analyses produced by `/reflect` |
 | `config.json` | Per-project recording toggle |
+| `dashboards/index.html` | Master dashboard listing all breakpoints and reflection status |
+| `dashboards/session-N.html` | Per-session HTML dashboard with charts and metrics |
+| `dashboards/manifest.jsonl` | Tracks which dashboards have been generated |
 
-Everything lives in `~/.reflection/` as plain JSON/JSONL. Human-readable, LLM-loadable, and portable.
+Everything lives in `~/.reflection/` as plain JSON/JSONL/HTML. Human-readable, LLM-loadable, and portable.
 
 ## What Gets *Read* (Not Copied)
 

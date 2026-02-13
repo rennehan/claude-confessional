@@ -3,6 +3,7 @@
 import confessional_store as store
 import transcript_reader as reader
 import confessional_hook as hook
+import dashboard_generator as dashboard
 
 
 def test_store_imports():
@@ -26,3 +27,11 @@ def test_hook_imports():
     """confessional_hook module imports and has key functions."""
     assert callable(hook.handle_session_start)
     assert callable(hook.get_project_name)
+
+
+def test_dashboard_imports():
+    """dashboard_generator module imports and has key functions."""
+    assert callable(dashboard.generate_session_html)
+    assert callable(dashboard.generate_index_html)
+    assert callable(dashboard.write_session_dashboard)
+    assert callable(dashboard.write_index_dashboard)
