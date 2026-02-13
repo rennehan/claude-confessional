@@ -174,6 +174,16 @@ class TestBarChartHtml:
         assert "42" in html
         assert "100" in html  # 100% width
 
+    def test_large_numbers_formatted(self):
+        html = dashboard._bar_chart_html([("Cache", 9835759)])
+        assert "9,835,759" in html
+        assert "9835759" not in html
+
+    def test_float_values_formatted(self):
+        html = dashboard._bar_chart_html([("Score", 33.0), ("Other", 617.5)])
+        assert "33" in html
+        assert "617.5" in html
+
 
 class TestSummaryCardHtml:
 
@@ -310,6 +320,33 @@ class TestGenerateSessionHtml:
         assert "90000%" not in html
         assert "96%" in html
 
+    def test_dominant_agency_label(self, breakpoint_data, reflection_meta):
+        """Dominant agency should display 'Let's' not 'lets'."""
+        data = _make_analysis_data()
+        data["prompt_linguistics"]["agency_framing"]["dominant"] = "lets"
+        html = dashboard.generate_session_html(
+            data, breakpoint_data, reflection_meta, "test-project")
+        assert "Let&#x27;s</strong>" in html or "Let's</strong>" in html
+        # Raw key should not appear as the display value
+        assert ">lets</strong>" not in html
+
+    def test_token_breakdown_split_charts(self, analysis_data, breakpoint_data,
+                                           reflection_meta):
+        """Token breakdown should have separate Input/Output and Cache charts."""
+        html = dashboard.generate_session_html(
+            analysis_data, breakpoint_data, reflection_meta, "test-project")
+        assert "Input / Output" in html
+        assert "Cache" in html
+
+    def test_tool_scatter_has_percent(self, analysis_data, breakpoint_data,
+                                      reflection_meta):
+        """Tool scatter values should display with % suffix."""
+        html = dashboard.generate_session_html(
+            analysis_data, breakpoint_data, reflection_meta, "test-project")
+        # Tool scatter section should use progress bars which include %
+        scatter_section = html.split("Tool Scatter")[1].split("<h2>")[0]
+        assert "%" in scatter_section
+
 
 # --- Tests: Index dashboard ---
 
@@ -349,6 +386,29 @@ class TestGenerateIndexHtml:
         html = dashboard.generate_index_html(breakpoints, [], [], "test-project")
         assert "Only one" in html
         assert "<!DOCTYPE html>" in html
+
+    def test_singular_pluralization(self):
+        """'1 breakpoint' not '1 breakpoints'."""
+        breakpoints = [
+            {"id": 1, "timestamp": "2025-02-13T14:00:00+00:00", "note": ""},
+        ]
+        reflections = [
+            {"id": 1, "breakpoint_id": 1, "timestamp": "2025-02-13T14:05:00+00:00"},
+        ]
+        html = dashboard.generate_index_html(breakpoints, reflections, [], "test-project")
+        assert "1 breakpoint " in html or "1 breakpoint&" in html
+        assert "1 reflection" in html
+        assert "1 breakpoints" not in html
+        assert "1 reflections" not in html
+
+    def test_plural_pluralization(self):
+        """'2 breakpoints' not '2 breakpoint'."""
+        breakpoints = [
+            {"id": 1, "timestamp": "t1", "note": ""},
+            {"id": 2, "timestamp": "t2", "note": ""},
+        ]
+        html = dashboard.generate_index_html(breakpoints, [], [], "test-project")
+        assert "2 breakpoints" in html
 
     def test_valid_html(self):
         html = dashboard.generate_index_html([], [], [], "test-project")

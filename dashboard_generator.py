@@ -193,6 +193,17 @@ a:hover { text-decoration: underline; }
 
 # --- HTML helpers ---
 
+def _format_value(value):
+    """Format a numeric value for display: comma-separate integers, keep floats short."""
+    if isinstance(value, int):
+        return f'{value:,}'
+    if isinstance(value, float):
+        if value == int(value):
+            return f'{int(value):,}'
+        return f'{value:,.1f}'
+    return str(value)
+
+
 def _bar_chart_html(items):
     """Render a horizontal bar chart. items: list of (label, value) tuples."""
     if not items:
@@ -205,13 +216,14 @@ def _bar_chart_html(items):
     for i, (label, value) in enumerate(items):
         pct = round((value / max_val) * 100)
         color_class = colors[i % len(colors)]
+        display_val = _format_value(value)
         rows.append(
             f'<div class="bar-row">'
             f'<span class="bar-label">{html.escape(str(label))}</span>'
             f'<div class="bar-track">'
             f'<div class="bar-fill {color_class}" style="width: {pct}%"></div>'
             f'</div>'
-            f'<span class="bar-value">{html.escape(str(value))}</span>'
+            f'<span class="bar-value">{html.escape(display_val)}</span>'
             f'</div>'
         )
     return '<div class="bar-chart">' + "\n".join(rows) + '</div>'
@@ -372,9 +384,11 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
         ("Let's", agency.get("lets_count", 0)),
     ]
     voice_parts.append(_bar_chart_html(agency_items))
-    dominant = agency.get("dominant", "none")
+    dominant_key = agency.get("dominant", "none")
+    dominant_labels = {"i": "I", "we": "We", "you": "You", "lets": "Let's", "none": "None"}
+    dominant_label = dominant_labels.get(dominant_key, dominant_key)
     voice_parts.append(
-        f'<div class="subtitle">Dominant: <strong>{html.escape(dominant)}</strong></div>')
+        f'<div class="subtitle">Dominant: <strong>{html.escape(dominant_label)}</strong></div>')
 
     # Certainty markers
     cert = linguistics.get("certainty_markers", {})
@@ -405,26 +419,21 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
         "Session Arc",
         '<h3>Prompt Length by Position (avg words)</h3>'
         + _bar_chart_html(arc_items)
-        + '<h3>Session Progression</h3>'
-        + _bar_chart_html([
-            ("First half", round(progression.get("first_half_correction_rate", 0) * 100, 1)),
-            ("Second half", round(progression.get("second_half_correction_rate", 0) * 100, 1)),
-        ])
+        + '<h3>Session Progression (correction rate)</h3>'
+        + _progress_bar_html(
+            progression.get("first_half_correction_rate", 0), "First half")
+        + _progress_bar_html(
+            progression.get("second_half_correction_rate", 0), "Second half")
         + f'<div style="margin-top:0.3rem">{warming_html}</div>'
     ))
 
-    # Tool scatter
+    # Tool scatter (use progress bars since these are 0.0-1.0 ratios)
     scatter = effectiveness.get("tool_scatter", {})
-    scatter_items = [
-        ("Question", round(scatter.get("question", 0) * 100, 1)),
-        ("Imperative", round(scatter.get("imperative", 0) * 100, 1)),
-        ("Statement", round(scatter.get("statement", 0) * 100, 1)),
-        ("Overall", round(scatter.get("overall", 0) * 100, 1)),
-    ]
-    parts.append(_section_html(
-        "Tool Scatter",
-        '<div class="subtitle">Higher = more scattered file access</div>'
-        + _bar_chart_html(scatter_items)))
+    scatter_html = '<div class="subtitle">Higher = more scattered file access</div>'
+    for style_label, style_key in [("Question", "question"), ("Imperative", "imperative"),
+                                    ("Statement", "statement"), ("Overall", "overall")]:
+        scatter_html += _progress_bar_html(scatter.get(style_key, 0), style_label)
+    parts.append(_section_html("Tool Scatter", scatter_html))
 
     # N-grams
     ngrams = linguistics.get("frequent_ngrams", {})
@@ -442,14 +451,21 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
         + _table_html(["Phrase", "Count"], trigram_rows)
         + '</div></div>'))
 
-    # Token breakdown
-    token_items = [
+    # Token breakdown — split into two charts since cache tokens dwarf input/output
+    io_items = [
         ("Input", total_input),
         ("Output", total_output),
-        ("Cache Read", cache_read),
-        ("Cache Create", token_stats.get("total_cache_creation", 0)),
     ]
-    parts.append(_section_html("Token Breakdown", _bar_chart_html(token_items)))
+    cache_items = [
+        ("Cache Read", cache_read),
+        ("Cache Create", cache_creation),
+    ]
+    parts.append(_section_html(
+        "Token Breakdown",
+        '<h3>Input / Output</h3>'
+        + _bar_chart_html(io_items)
+        + '<h3>Cache</h3>'
+        + _bar_chart_html(cache_items)))
 
     body = "\n".join(parts)
     return _wrap_html(f"{project} — Session Dashboard", body)
@@ -473,10 +489,14 @@ def generate_index_html(breakpoints, reflections, manifest, project):
 
     parts = []
     parts.append(f'<h1>{html.escape(project)}</h1>')
+    bp_count = len(breakpoints)
+    ref_count = len(reflections)
+    bp_word = "breakpoint" if bp_count == 1 else "breakpoints"
+    ref_word = "reflection" if ref_count == 1 else "reflections"
     parts.append(
         f'<div class="subtitle">'
-        f'{len(breakpoints)} breakpoints &mdash; '
-        f'{len(reflections)} reflections'
+        f'{bp_count} {bp_word} &mdash; '
+        f'{ref_count} {ref_word}'
         f'</div>')
 
     # Breakpoint table
