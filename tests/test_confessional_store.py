@@ -166,6 +166,28 @@ class TestBreakpoints:
     def test_get_all_empty(self, project):
         assert store.get_all_breakpoints(project) == []
 
+    def test_get_breakpoint_by_id(self, project):
+        store.add_breakpoint(project, "first")
+        store.add_breakpoint(project, "second")
+        store.add_breakpoint(project, "third")
+        bp = store.get_breakpoint_by_id(project, 2)
+        assert bp["id"] == 2
+        assert bp["note"] == "second"
+
+    def test_get_breakpoint_by_id_first(self, project):
+        store.add_breakpoint(project, "first")
+        store.add_breakpoint(project, "second")
+        bp = store.get_breakpoint_by_id(project, 1)
+        assert bp["id"] == 1
+        assert bp["note"] == "first"
+
+    def test_get_breakpoint_by_id_not_found(self, project):
+        store.add_breakpoint(project, "only")
+        assert store.get_breakpoint_by_id(project, 99) is None
+
+    def test_get_breakpoint_by_id_empty(self, project):
+        assert store.get_breakpoint_by_id(project, 1) is None
+
 
 # --- Tests: Reflections ---
 
@@ -323,6 +345,42 @@ class TestCLI:
     def test_cli_get_previous_breakpoint_none(self, monkeypatch, capsys, project):
         monkeypatch.setattr("sys.argv",
                           ["confessional_store.py", "get_previous_breakpoint", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert "error" in data
+
+    def test_cli_get_all_breakpoints(self, monkeypatch, capsys, project):
+        store.add_breakpoint(project, "a")
+        store.add_breakpoint(project, "b")
+        store.add_breakpoint(project, "c")
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_all_breakpoints", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert len(data) == 3
+        assert data[0]["note"] == "a"
+        assert data[2]["note"] == "c"
+
+    def test_cli_get_all_breakpoints_empty(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_all_breakpoints", project])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data == []
+
+    def test_cli_get_breakpoint_by_id(self, monkeypatch, capsys, project):
+        store.add_breakpoint(project, "first")
+        store.add_breakpoint(project, "second")
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_breakpoint_by_id", project, "2"])
+        store.main()
+        data = json.loads(capsys.readouterr().out)
+        assert data["id"] == 2
+        assert data["note"] == "second"
+
+    def test_cli_get_breakpoint_by_id_not_found(self, monkeypatch, capsys, project):
+        monkeypatch.setattr("sys.argv",
+                          ["confessional_store.py", "get_breakpoint_by_id", project, "99"])
         store.main()
         data = json.loads(capsys.readouterr().out)
         assert "error" in data

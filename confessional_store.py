@@ -117,6 +117,15 @@ def get_all_breakpoints(project):
     return _read_jsonl(_project_dir(project) / "breakpoints.jsonl")
 
 
+def get_breakpoint_by_id(project, breakpoint_id):
+    """Get a specific breakpoint by its integer ID. Returns None if not found."""
+    entries = get_all_breakpoints(project)
+    for bp in entries:
+        if bp.get("id") == breakpoint_id:
+            return bp
+    return None
+
+
 # --- Reflections ---
 
 def store_reflection(project, reflection_text, git_summary="", prompt_count=0):
@@ -215,6 +224,7 @@ def main():
     if len(sys.argv) < 3:
         print("Usage: confessional_store.py <command> <project> [args...] [--stdin]")
         print("Commands: breakpoint, get_current_breakpoint, get_previous_breakpoint,")
+        print("          get_all_breakpoints, get_breakpoint_by_id,")
         print("          store_reflection, get_reflections, get_reflections_summary,")
         print("          enable_recording, disable_recording, is_recording, init")
         sys.exit(1)
@@ -254,6 +264,18 @@ def main():
             print(json.dumps(bp))
         else:
             print(json.dumps({"error": "No previous breakpoint."}))
+
+    elif command == "get_all_breakpoints":
+        bps = get_all_breakpoints(project)
+        print(json.dumps(bps, indent=2))
+
+    elif command == "get_breakpoint_by_id":
+        bp_id = int(arg(3, "0"))
+        bp = get_breakpoint_by_id(project, bp_id)
+        if bp:
+            print(json.dumps(bp))
+        else:
+            print(json.dumps({"error": f"No breakpoint with id {bp_id}."}))
 
     elif command == "store_reflection":
         if use_stdin:

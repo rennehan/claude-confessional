@@ -16,12 +16,19 @@ CWD=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PROJECT=$(basename "$CWD")
 ```
 
-Get the current breakpoint window:
+Get the current breakpoint and all breakpoints:
 ```bash
 python3 ~/.claude/scripts/confessional_store.py get_current_breakpoint "$PROJECT"
+python3 ~/.claude/scripts/confessional_store.py get_all_breakpoints "$PROJECT"
 ```
 
-Get all session data since the breakpoint (turns, tools, token metrics, session metadata):
+**Choose the reflection range.** If there are 3 or more breakpoints (current + at least 2 prior), use `AskUserQuestion` to let the user pick how far back to reflect. Present the most recent breakpoints (up to 5) as options:
+- Option 1: "Since last breakpoint" (default — the most recent breakpoint timestamp)
+- Option 2+: "Since breakpoint N: <note> (<date>)" for each earlier breakpoint
+
+Use the selected breakpoint's timestamp as `<breakpoint_timestamp>` for all subsequent commands. If there are fewer than 3 breakpoints, skip the prompt and use the current breakpoint timestamp (default behavior).
+
+Get all session data since the selected breakpoint (turns, tools, token metrics, session metadata):
 ```bash
 python3 ~/.claude/scripts/transcript_reader.py analyze "$CWD" "<breakpoint_timestamp>"
 ```
