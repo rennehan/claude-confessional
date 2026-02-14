@@ -43,9 +43,17 @@ confessional only stores what's *unique*:
 
 - **Breakpoints** — session boundaries you define (`~/.reflection/projects/<project>/breakpoints.jsonl`)
 - **Reflections** — methodology analyses (`~/.reflection/projects/<project>/reflections.jsonl`)
-- **Recording state** — which projects are active (`~/.reflection/config.json`)
+- **Recording state** — which projects are active, tracked per-project (`~/.reflection/config.json`)
 
 Everything is plain text. No SQL. No database. Just JSON and JSONL files you can `cat`, pipe to an LLM, or load into any tool.
+
+### Transcript Retention
+
+Because confessional reads from Claude Code's native transcripts on-demand, those transcripts need to still exist when you `/reflect`. Claude Code automatically cleans up local transcripts after a configurable period (around 30 days by default). If you wait too long between a `/breakpoint` and `/reflect`, the transcript data for that session may already be gone.
+
+Your confessional data in `~/.reflection/` (breakpoints, reflections, dashboards) is **never auto-cleaned** — once you generate a reflection, it's yours permanently. But you can only generate a reflection while the source transcripts still exist.
+
+**Recommendation:** Run `/reflect` reasonably soon after a breakpoint. Don't let weeks pass. If you want a longer window, increase `cleanupPeriodDays` in your Claude Code settings (`~/.claude/settings.json`) to retain transcripts for longer.
 
 ### Architecture
 
@@ -62,9 +70,9 @@ A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no t
 
 ### `/record` — Start Recording
 
-Enable recording for the current project. From then on, confessional tracks your session boundaries and can analyze your conversation data on-demand.
+Enable recording for the current project. Recording is **per-project** — you enable it independently in each project you want to track, and projects you haven't enabled are never touched. There is no global "always on" mode. Works in any directory — git repos and plain folders alike.
 
-Recording persists across sessions — once enabled, it stays on until you disable it.
+Once enabled for a project, recording persists across sessions — it stays on until you explicitly disable it. You only need to run `/record` once per project.
 
 ### `/breakpoint` — Mark a Session Boundary
 
@@ -73,6 +81,8 @@ Mark the end of a work session. Optionally attach a note:
 ```
 /breakpoint Finished the auth refactor.
 ```
+
+Breakpoints are also **created automatically** — a system hook fires on every SessionStart and inserts a breakpoint if your last session in that project was more than 4 hours ago. So if you forget to `/breakpoint` at the end of a session, the next session will pick up the boundary for you.
 
 ### `/reflect` — Analyze Your Methodology
 
@@ -87,7 +97,7 @@ Reflections accumulate. Over time, Claude can trace the evolution of your method
 ## The Loop
 
 ```
-/record          <- enable recording (once per project)
+/record          <- enable recording (once per project, not global)
   ... work ...
 /breakpoint      <- mark a boundary
 /reflect         <- analyze your methodology
