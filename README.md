@@ -62,6 +62,8 @@ Breakpoints are also **created automatically** — a system hook fires on every 
 
 Claude reads every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
 
+If you have enough breakpoint history (3+), you'll be prompted to choose how far back to reflect — just the last session, or a wider arc spanning multiple sessions. This lets you zoom out and see how your methodology evolves over a longer stretch of work.
+
 The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
 
 Each reflection also generates an **HTML dashboard** — a self-contained, pure-CSS visualization of your session data. Open it in any browser. No JavaScript, no CDN, no network requests. The master index at `~/.reflection/projects/<project>/dashboards/index.html` lists all breakpoints and links to reflected sessions.
