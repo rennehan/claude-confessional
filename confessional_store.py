@@ -128,7 +128,8 @@ def get_breakpoint_by_id(project, breakpoint_id):
 
 # --- Reflections ---
 
-def store_reflection(project, reflection_text, git_summary="", prompt_count=0):
+def store_reflection(project, reflection_text, git_summary="", prompt_count=0,
+                     loops=None):
     """Append a reflection entry. Returns the new reflection dict."""
     ref_path = _project_dir(project) / "reflections.jsonl"
     existing = _read_jsonl(ref_path)
@@ -146,9 +147,25 @@ def store_reflection(project, reflection_text, git_summary="", prompt_count=0):
         "reflection": reflection_text,
         "git_summary": git_summary,
         "prompt_count": prompt_count,
+        "loops": loops or [],
     }
     _append_jsonl(ref_path, entry)
     return entry
+
+
+def get_all_loops(project):
+    """Get all methodology loops across reflections, with metadata."""
+    reflections = get_reflections(project)
+    loops = []
+    for ref in reflections:
+        for loop_text in ref.get("loops", []):
+            loops.append({
+                "loop": loop_text,
+                "reflection_id": ref["id"],
+                "timestamp": ref["timestamp"],
+                "breakpoint_id": ref.get("breakpoint_id"),
+            })
+    return loops
 
 
 def get_reflections(project):
@@ -230,7 +247,22 @@ def main():
         sys.exit(1)
 
     use_stdin = "--stdin" in sys.argv
-    argv = [a for a in sys.argv if a != "--stdin"]
+    # Extract --loops value if present
+    loops_value = None
+    filtered_argv = []
+    skip_next = False
+    for i, a in enumerate(sys.argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if a == "--loops" and i + 1 < len(sys.argv):
+            loops_value = json.loads(sys.argv[i + 1])
+            skip_next = True
+        elif a == "--stdin":
+            continue
+        else:
+            filtered_argv.append(a)
+    argv = filtered_argv
 
     command = argv[1]
     project = argv[2]
@@ -279,9 +311,11 @@ def main():
 
     elif command == "store_reflection":
         if use_stdin:
-            ref = store_reflection(project, stdin_text, arg(3, ""), int(arg(4, "0")))
+            ref = store_reflection(project, stdin_text, arg(3, ""), int(arg(4, "0")),
+                                   loops=loops_value)
         else:
-            ref = store_reflection(project, arg(3), arg(4, ""), int(arg(5, "0")))
+            ref = store_reflection(project, arg(3), arg(4, ""), int(arg(5, "0")),
+                                   loops=loops_value)
         print(json.dumps({"id": ref["id"], "stored": True}))
 
     elif command == "get_reflections":
@@ -308,6 +342,10 @@ def main():
         entry = append_dashboard_manifest(
             project, int(arg(3)), int(arg(4)), arg(5))
         print(json.dumps(entry))
+
+    elif command == "get_all_loops":
+        loops = get_all_loops(project)
+        print(json.dumps(loops, indent=2))
 
     elif command == "get_dashboard_manifest":
         manifest = get_dashboard_manifest(project)

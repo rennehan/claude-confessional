@@ -473,7 +473,7 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
 
 # --- Index dashboard ---
 
-def generate_index_html(breakpoints, reflections, manifest, project):
+def generate_index_html(breakpoints, reflections, manifest, project, loops=None):
     """Generate the master index dashboard HTML string."""
     # Build lookup: breakpoint_id -> reflection
     reflected_ids = set()
@@ -498,6 +498,22 @@ def generate_index_html(breakpoints, reflections, manifest, project):
         f'{bp_count} {bp_word} &mdash; '
         f'{ref_count} {ref_word}'
         f'</div>')
+
+    # Methodology Loops section
+    if loops:
+        loop_items = []
+        for entry in loops:
+            ts = entry.get("timestamp", "")
+            date = ts[:10] if len(ts) >= 10 else ts
+            ref_id = entry.get("reflection_id", "?")
+            loop_items.append(
+                f'<div class="card">'
+                f'<div class="metric-value">{html.escape(entry["loop"])}</div>'
+                f'<div class="metric-label">Reflection #{ref_id} &mdash; {html.escape(date)}</div>'
+                f'</div>'
+            )
+        loops_html = f'<div class="grid">{"".join(loop_items)}</div>'
+        parts.append(_section_html("Methodology Loops", loops_html))
 
     # Breakpoint table
     rows = []
@@ -569,12 +585,12 @@ def write_session_dashboard(project, breakpoint_id, analysis_data,
     return path
 
 
-def write_index_dashboard(project, breakpoints, reflections, manifest):
+def write_index_dashboard(project, breakpoints, reflections, manifest, loops=None):
     """Write/overwrite the index dashboard HTML file. Returns the file Path."""
     dashboards_dir = store._dashboards_dir(project)
     dashboards_dir.mkdir(parents=True, exist_ok=True)
     path = dashboards_dir / "index.html"
-    content = generate_index_html(breakpoints, reflections, manifest, project)
+    content = generate_index_html(breakpoints, reflections, manifest, project, loops)
     path.write_text(content, encoding="utf-8")
     return path
 
@@ -614,8 +630,9 @@ def main():
         breakpoints = store.get_all_breakpoints(project)
         reflections = store.get_reflections(project)
         manifest = store.get_dashboard_manifest(project)
+        loops = store.get_all_loops(project)
         path = write_index_dashboard(
-            project, breakpoints, reflections, manifest)
+            project, breakpoints, reflections, manifest, loops)
         print(json.dumps({"path": str(path)}))
 
     else:

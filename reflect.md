@@ -136,9 +136,11 @@ Write a reflection that captures the methodology, not the content. Structure it 
 
 ### 4. Store and Present
 
-Store the reflection using `--stdin` with a heredoc to safely pass the reflection text:
+Extract the methodology loops from the reflection as short arrow-chain descriptions (e.g., `"Experience → Question → Direct → Ship"`). Include as many loops as were identified in the reflection.
+
+Store the reflection using `--stdin` with a heredoc to safely pass the reflection text. Pass the loops as a JSON array via `--loops`:
 ```bash
-python3 ~/.claude/scripts/confessional_store.py store_reflection "$PROJECT" "<git_summary>" <prompt_count> --stdin <<'CONFESSIONAL_EOF'
+python3 ~/.claude/scripts/confessional_store.py store_reflection "$PROJECT" "<git_summary>" <prompt_count> --stdin --loops '["Loop 1 → Step 2 → Step 3", "Another → Pattern"]' <<'CONFESSIONAL_EOF'
 <reflection_text>
 CONFESSIONAL_EOF
 ```

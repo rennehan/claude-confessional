@@ -234,6 +234,47 @@ class TestReflections:
         ref = store.store_reflection(project, "Orphan reflection")
         assert ref["breakpoint_id"] is None
 
+    def test_store_reflection_with_loops(self, project):
+        store.add_breakpoint(project, "bp")
+        loops = ["Experience → Question → Direct → Ship", "Discover → Investigate → Validate"]
+        ref = store.store_reflection(project, "Reflection", "1 commit", 5, loops=loops)
+        assert ref["loops"] == loops
+        # Verify persisted
+        refs = store.get_reflections(project)
+        assert refs[0]["loops"] == loops
+
+    def test_store_reflection_without_loops_defaults_empty(self, project):
+        store.add_breakpoint(project, "bp")
+        ref = store.store_reflection(project, "No loops here")
+        assert ref["loops"] == []
+
+    def test_get_all_loops(self, project):
+        store.add_breakpoint(project, "bp1")
+        store.store_reflection(project, "R1", loops=["A → B → C"])
+        store.store_reflection(project, "R2", loops=["D → E", "F → G → H"])
+        loops = store.get_all_loops(project)
+        assert len(loops) == 3
+        assert loops[0]["loop"] == "A → B → C"
+        assert loops[0]["reflection_id"] == 1
+        assert loops[1]["loop"] == "D → E"
+        assert loops[1]["reflection_id"] == 2
+        assert loops[2]["loop"] == "F → G → H"
+
+    def test_get_all_loops_empty(self, project):
+        assert store.get_all_loops(project) == []
+
+    def test_get_all_loops_backward_compat(self, project):
+        """Old reflections without loops field should not break get_all_loops."""
+        store.add_breakpoint(project, "bp")
+        store.store_reflection(project, "Old style reflection")
+        # Manually remove the loops key to simulate old data
+        ref_path = store._project_dir(project) / "reflections.jsonl"
+        data = store._read_jsonl(ref_path)
+        del data[0]["loops"]
+        ref_path.write_text(json.dumps(data[0]) + "\n", encoding="utf-8")
+        # Should return empty, not crash
+        assert store.get_all_loops(project) == []
+
 
 # --- Tests: Dashboard Manifest ---
 
