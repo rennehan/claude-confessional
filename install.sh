@@ -34,4 +34,51 @@ chmod +x ~/.claude/scripts/confessional_store.py \
 # Register hooks
 python3 ~/.claude/scripts/confessional_hook.py --install
 
-echo "Done. Restart Claude Code to activate hooks."
+# Praying hands ASCII art by ejm (ascii.co.uk/art/prayer)
+cat <<'ART'
+
+ ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
+██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝
+██║     ██║     ███████║██║   ██║██║  ██║█████╗
+██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝
+╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗
+ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝
+       C O N F E S S I O N A L
+
+ART
+
+sleep 0.3
+
+lines=(
+"                         _"
+"                       _|_|_"
+"                     ,|_| |_|_"
+"                     || | | |_|"
+"                     || | | | |"
+"                     || | | | |"
+"                    _|| | | | |"
+"                  ||)\\  ^ ^ ^ |"
+"                  || |        |"
+"                  || |        |"
+"                  || |        |"
+"                  \\\\          |"
+"                   \\\\         /"
+"                    )\\       ("
+"                   /  \\       \\"
+"                  /    \\       \\"
+"                        \\       \\"
+)
+
+for line in "${lines[@]}"; do
+    echo "$line"
+    sleep 0.05
+done
+
+sleep 0.2
+echo ""
+echo "  ██████████████████████████████████████████████████"
+echo "  █                                                █"
+echo "  █        Restart Claude Code to begin.           █"
+echo "  █                                                █"
+echo "  ██████████████████████████████████████████████████"
+echo ""
