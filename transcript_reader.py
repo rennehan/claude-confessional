@@ -81,7 +81,7 @@ def get_transcript_dir(cwd: str) -> Path:
 def _read_jsonl(path: Path) -> list[dict]:
     """Read all entries from a JSONL file, skipping corrupt lines."""
     entries = []
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -94,7 +94,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 def _get_first_timestamp(path: Path) -> str:
     """Get the timestamp of the first entry in a JSONL file."""
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -799,7 +799,7 @@ def main():
     if command == "analyze":
         since = sys.argv[3] if len(sys.argv) > 3 else ""
         result = get_turns_since(cwd, since)
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result, indent=2, ensure_ascii=False))
     elif command == "sessions":
         sessions = find_sessions(cwd)
         result = []
@@ -813,7 +813,7 @@ def main():
                 "turn_count": len(parsed["turns"]),
                 "path": str(path),
             })
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result, indent=2, ensure_ascii=False))
     elif command == "stats":
         since = sys.argv[3] if len(sys.argv) > 3 else ""
         result = get_turns_since(cwd, since)
@@ -824,7 +824,7 @@ def main():
             "session_count": len(result["sessions"]),
             "prompt_linguistics": result["prompt_linguistics"],
             "effectiveness_signals": result["effectiveness_signals"],
-        }, indent=2))
+        }, indent=2, ensure_ascii=False))
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

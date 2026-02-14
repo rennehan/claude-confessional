@@ -1289,3 +1289,41 @@ class TestCLI:
         with pytest.raises(SystemExit) as exc_info:
             reader.main()
         assert exc_info.value.code == 1
+
+    def test_cli_analyze_no_surrogate_escapes(self, tmp_path, monkeypatch, capsys):
+        """CLI analyze output uses raw UTF-8 for emoji, not surrogate pair escapes.
+
+        Surrogate escapes like \\ud83d\\ude4f break when passed through shell
+        variable interpolation (bash $() captures), producing invalid CESU-8 bytes.
+        """
+        import transcript_reader as reader
+        project_dir = tmp_path / "sessions"
+        project_dir.mkdir()
+        ts = _ts(1)
+        # Write raw JSON with actual \uD83D\uDE4F surrogate pair escapes,
+        # simulating what Claude Code writes for emoji like prayer hands.
+        # We must write raw JSON, not use json.dumps, because json.dumps
+        # would convert the surrogate pair to the real emoji character.
+        path = project_dir / "emoji-sess.jsonl"
+        queue_line = json.dumps(_queue_entry(timestamp=ts))
+        assistant_line = json.dumps(_assistant_entry(
+            [{"type": "text", "text": "Hi!"}], timestamp=ts))
+        # Build the user entry JSON, then replace the prompt text with raw
+        # surrogate pair escapes (as they appear in real Claude Code transcripts)
+        user = _user_entry("PLACEHOLDER", timestamp=ts)
+        user_line = json.dumps(user).replace("PLACEHOLDER", "Hello \\ud83d\\ude4f world")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(queue_line + "\n")
+            f.write(user_line + "\n")
+            f.write(assistant_line + "\n")
+        monkeypatch.setattr(reader, "get_transcript_dir", lambda cwd: project_dir)
+        monkeypatch.setattr("sys.argv",
+                          ["transcript_reader.py", "analyze", "/tmp/proj", _ts(10)])
+        reader.main()
+        output = capsys.readouterr().out
+        # Output must not contain surrogate pair escapes
+        assert "\\ud83d" not in output
+        assert "\\ude4f" not in output
+        # Must be valid JSON and contain the emoji as real UTF-8
+        data = json.loads(output)
+        assert data["turn_count"] >= 1

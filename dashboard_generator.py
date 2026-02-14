@@ -565,7 +565,7 @@ def write_session_dashboard(project, breakpoint_id, analysis_data,
     path = dashboards_dir / f"session-{breakpoint_id}.html"
     content = generate_session_html(
         analysis_data, breakpoint, reflection_meta, project)
-    path.write_text(content)
+    path.write_text(content, encoding="utf-8")
     return path
 
 
@@ -575,7 +575,7 @@ def write_index_dashboard(project, breakpoints, reflections, manifest):
     dashboards_dir.mkdir(parents=True, exist_ok=True)
     path = dashboards_dir / "index.html"
     content = generate_index_html(breakpoints, reflections, manifest, project)
-    path.write_text(content)
+    path.write_text(content, encoding="utf-8")
     return path
 
 
@@ -596,7 +596,10 @@ def main():
     if command == "session":
         breakpoint_id = int(argv[3]) if len(argv) > 3 else 1
         if use_stdin:
-            data = json.loads(sys.stdin.read())
+            if hasattr(sys.stdin, "buffer"):
+                data = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="surrogatepass"))
+            else:
+                data = json.loads(sys.stdin.read())
         else:
             print(json.dumps({"error": "session command requires --stdin"}))
             sys.exit(1)

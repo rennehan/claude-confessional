@@ -41,7 +41,7 @@ def _read_jsonl(path):
     if not path.exists():
         return []
     entries = []
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -56,8 +56,8 @@ def _append_jsonl(path, entry):
     """Append a single JSON entry to a JSONL file. Creates dirs if needed."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a") as f:
-        f.write(json.dumps(entry, separators=(",", ":")) + "\n")
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, separators=(",", ":"), ensure_ascii=False) + "\n")
 
 
 # --- Config I/O ---
@@ -66,7 +66,7 @@ def _read_config():
     """Read config.json. Returns empty dict if missing."""
     if not CONFIG_PATH.exists():
         return {}
-    with open(CONFIG_PATH, "r") as f:
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -75,7 +75,7 @@ def _write_config(config):
     STORE_DIR.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=str(STORE_DIR), suffix=".json")
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
             f.write("\n")
         os.replace(tmp_path, str(CONFIG_PATH))
