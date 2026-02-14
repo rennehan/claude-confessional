@@ -16,24 +16,68 @@ Claude Code ships with [`/insights`](https://www.zolkos.com/2026/02/04/deep-dive
 ## Installation
 
 ```bash
-# Create directories
+git clone https://github.com/rennehan/claude-confessional.git
+cd claude-confessional
+./install.sh
+```
+
+Restart Claude Code after installing.
+
+<details>
+<summary>Manual installation</summary>
+
+```bash
 mkdir -p ~/.claude/commands ~/.claude/scripts
 
-# Install commands and scripts
-cp record.md ~/.claude/commands/
-cp breakpoint.md ~/.claude/commands/
-cp reflect.md ~/.claude/commands/
-cp confessional_store.py ~/.claude/scripts/
-cp transcript_reader.py ~/.claude/scripts/
-cp confessional_hook.py ~/.claude/scripts/
-cp dashboard_generator.py ~/.claude/scripts/
+cp record.md breakpoint.md reflect.md ~/.claude/commands/
+cp confess.md amen.md sermon.md ~/.claude/commands/
+cp confessional_store.py transcript_reader.py confessional_hook.py dashboard_generator.py ~/.claude/scripts/
 chmod +x ~/.claude/scripts/confessional_store.py ~/.claude/scripts/transcript_reader.py ~/.claude/scripts/confessional_hook.py ~/.claude/scripts/dashboard_generator.py
 
-# Register the system hooks
 python3 ~/.claude/scripts/confessional_hook.py --install
 ```
 
 Restart Claude Code after installing hooks.
+</details>
+
+## Usage
+
+### `/record` — Start Recording
+
+Enable recording for the current project. Recording is **per-project** — you enable it independently in each project you want to track, and projects you haven't enabled are never touched. There is no global "always on" mode. Works in any directory — git repos and plain folders alike.
+
+Once enabled for a project, recording persists across sessions — it stays on until you explicitly disable it. You only need to run `/record` once per project.
+
+### `/breakpoint` — Mark a Session Boundary
+
+Mark the end of a work session. Optionally attach a note:
+
+```
+/breakpoint Finished the auth refactor.
+```
+
+Breakpoints are also **created automatically** — a system hook fires on every SessionStart and inserts a breakpoint if your last session in that project was more than 4 hours ago. So if you forget to `/breakpoint` at the end of a session, the next session will pick up the boundary for you.
+
+### `/reflect` — Analyze Your Methodology
+
+Claude reads every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
+
+The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
+
+Each reflection also generates an **HTML dashboard** — a self-contained, pure-CSS visualization of your session data. Open it in any browser. No JavaScript, no CDN, no network requests. The master index at `~/.reflection/projects/<project>/dashboards/index.html` lists all breakpoints and links to reflected sessions.
+
+Reflections accumulate. Over time, Claude can trace the evolution of your methodology.
+
+### The Loop
+
+```
+/record          <- enable recording (once per project, not global)
+  ... work ...
+/breakpoint      <- mark a boundary
+/reflect         <- analyze your methodology
+  ... work ...   <- recording continues automatically
+/breakpoint      <- mark another boundary
+```
 
 ## How It Works
 
@@ -65,45 +109,6 @@ Your confessional data in `~/.reflection/` (breakpoints, reflections, dashboards
 | `dashboard_generator.py` | Pure-CSS HTML dashboards: per-session visualizations and master index |
 
 A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no tokens spent on bookkeeping.
-
-## Usage
-
-### `/record` — Start Recording
-
-Enable recording for the current project. Recording is **per-project** — you enable it independently in each project you want to track, and projects you haven't enabled are never touched. There is no global "always on" mode. Works in any directory — git repos and plain folders alike.
-
-Once enabled for a project, recording persists across sessions — it stays on until you explicitly disable it. You only need to run `/record` once per project.
-
-### `/breakpoint` — Mark a Session Boundary
-
-Mark the end of a work session. Optionally attach a note:
-
-```
-/breakpoint Finished the auth refactor.
-```
-
-Breakpoints are also **created automatically** — a system hook fires on every SessionStart and inserts a breakpoint if your last session in that project was more than 4 hours ago. So if you forget to `/breakpoint` at the end of a session, the next session will pick up the boundary for you.
-
-### `/reflect` — Analyze Your Methodology
-
-Claude reads every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
-
-The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
-
-Each reflection also generates an **HTML dashboard** — a self-contained, pure-CSS visualization of your session data. Open it in any browser. No JavaScript, no CDN, no network requests. The master index at `~/.reflection/projects/<project>/dashboards/index.html` lists all breakpoints and links to reflected sessions.
-
-Reflections accumulate. Over time, Claude can trace the evolution of your methodology.
-
-## The Loop
-
-```
-/record          <- enable recording (once per project, not global)
-  ... work ...
-/breakpoint      <- mark a boundary
-/reflect         <- analyze your methodology
-  ... work ...   <- recording continues automatically
-/breakpoint      <- mark another boundary
-```
 
 ## What Gets Stored
 
