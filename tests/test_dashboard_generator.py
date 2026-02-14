@@ -2,10 +2,12 @@
 
 Covers:
 - HTML helper functions: bar chart, summary card, table, progress bar
-- Session dashboard generation: sections, data rendering, validity
-- Index dashboard generation: breakpoint listing, reflection linking
+- Markdown-to-HTML conversion
+- Reflection dashboard generation: sections, data rendering, loops, full text
+- Index dashboard generation: reflection listing, loop linking
 - File write functions: path format, creation, overwrite
 - CLI interface
+- Backward compatibility with old session API
 """
 
 import json
@@ -109,18 +111,18 @@ def _make_analysis_data(**overrides):
     return data
 
 
-def _make_breakpoint(id=2, note="End of session"):
-    return {
-        "id": id,
-        "timestamp": "2025-02-13T16:00:00+00:00",
-        "note": note,
-    }
+_DEFAULT_LOOPS = ["Experience \u2192 Question \u2192 Ship"]
 
 
-def _make_reflection_meta(id=1):
+def _make_reflection(id=1, loops=_DEFAULT_LOOPS, text="## Overview\n\nThis was a **great** session."):
     return {
         "id": id,
         "timestamp": "2025-02-13T16:05:00+00:00",
+        "breakpoint_id": 2,
+        "reflection": text,
+        "git_summary": "3 commits: feature work",
+        "prompt_count": 14,
+        "loops": list(loops),
     }
 
 
@@ -143,13 +145,8 @@ def analysis_data():
 
 
 @pytest.fixture
-def breakpoint_data():
-    return _make_breakpoint()
-
-
-@pytest.fixture
-def reflection_meta():
-    return _make_reflection_meta()
+def reflection_data():
+    return _make_reflection()
 
 
 # --- Tests: HTML helpers ---
@@ -157,8 +154,7 @@ def reflection_meta():
 class TestBarChartHtml:
 
     def test_basic(self):
-        items = [("Read", 10), ("Bash", 8), ("Edit", 5)]
-        html = dashboard._bar_chart_html(items)
+        html = dashboard._bar_chart_html([("Read", 10), ("Bash", 8), ("Edit", 5)])
         assert "Read" in html
         assert "Bash" in html
         assert "10" in html
@@ -224,87 +220,147 @@ class TestProgressBarHtml:
         assert "75" in html
 
 
-# --- Tests: Session dashboard ---
+# --- Tests: Markdown to HTML ---
 
-class TestGenerateSessionHtml:
+class TestMarkdownToHtml:
 
-    def test_contains_sections(self, analysis_data, breakpoint_data,
-                               reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_headers(self):
+        result = dashboard._markdown_to_html("# Title\n\n## Section\n\n### Sub")
+        assert "<h1>" in result
+        assert "<h2>" in result
+        assert "<h3>" in result
+
+    def test_bold(self):
+        result = dashboard._markdown_to_html("This is **bold** text.")
+        assert "<strong>bold</strong>" in result
+
+    def test_code_spans(self):
+        result = dashboard._markdown_to_html("Use `foo()` here.")
+        assert "<code>foo()</code>" in result
+
+    def test_list_items(self):
+        result = dashboard._markdown_to_html("- first\n- second\n- third")
+        assert "<ul>" in result
+        assert "<li>" in result
+        assert "first" in result
+        assert "second" in result
+
+    def test_paragraphs(self):
+        result = dashboard._markdown_to_html("Line one.\n\nLine two.")
+        assert "<p>" in result
+
+    def test_escapes_html(self):
+        result = dashboard._markdown_to_html("Use <script>alert(1)</script>")
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result
+
+    def test_bold_in_headers(self):
+        result = dashboard._markdown_to_html("## 1. **The Loop**")
+        assert "<strong>The Loop</strong>" in result
+        assert "<h2>" in result
+
+
+# --- Tests: Reflection dashboard ---
+
+class TestGenerateReflectionHtml:
+
+    def test_contains_sections(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         for heading in ["Tool Usage", "Prompt Style", "Voice Profile",
                         "Session Arc", "N-grams", "Token"]:
             assert heading in html, f"Missing section: {heading}"
 
-    def test_tool_chart(self, analysis_data, breakpoint_data, reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_header_shows_reflection_id(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
+        assert "Reflection #1" in html
+
+    def test_shows_git_summary(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
+        assert "3 commits" in html
+
+    def test_shows_methodology_loops(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
+        assert "Methodology Loops" in html
+        assert "Experience" in html
+
+    def test_shows_full_reflection_text(self, analysis_data):
+        ref = _make_reflection(text="## Overview\n\nThis was a **great** session.")
+        html = dashboard.generate_reflection_html(
+            analysis_data, ref, "test-project")
+        assert "Full Reflection" in html
+        assert "great" in html
+        assert "reflection-text" in html
+
+    def test_no_reflection_text_skips_section(self, analysis_data):
+        ref = _make_reflection(text="")
+        html = dashboard.generate_reflection_html(
+            analysis_data, ref, "test-project")
+        assert "Full Reflection" not in html
+
+    def test_tool_chart(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert "Read" in html
         assert "Bash" in html
         assert "Edit" in html
 
-    def test_effectiveness_table(self, analysis_data, breakpoint_data,
-                                 reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_effectiveness_table(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert "question" in html
         assert "imperative" in html
         assert "statement" in html
 
-    def test_voice_profile(self, analysis_data, breakpoint_data,
-                           reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
-        # Agency framing
+    def test_voice_profile(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         for label in ["I", "We", "You"]:
             assert label in html
-        # Let's gets HTML-escaped (apostrophe)
         assert "Let" in html
-        # Certainty markers
         assert "hedging" in html.lower() or "assertive" in html.lower()
 
-    def test_ngrams(self, analysis_data, breakpoint_data, reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_ngrams(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert "add test" in html
         assert "make sure" in html
         assert "add test for" in html
 
-    def test_valid_html(self, analysis_data, breakpoint_data, reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_valid_html(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert html.strip().startswith("<!DOCTYPE html>")
         assert "</html>" in html
 
-    def test_no_external_resources(self, analysis_data, breakpoint_data,
-                                   reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_no_external_resources(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert "<script src=" not in html
         assert "<link href=" not in html
         assert "cdn" not in html.lower()
 
-    def test_html_escapes_special_chars(self, breakpoint_data,
-                                        reflection_meta):
+    def test_html_escapes_special_chars(self):
         data = _make_analysis_data()
         data["prompt_linguistics"]["frequent_ngrams"]["bigrams"] = [
             {"ngram": "<script>alert(1)</script>", "count": 5}
         ]
-        html = dashboard.generate_session_html(
-            data, breakpoint_data, reflection_meta, "test-project")
+        ref = _make_reflection()
+        html = dashboard.generate_reflection_html(data, ref, "test-project")
         assert "<script>alert(1)</script>" not in html
         assert "&lt;script&gt;" in html
 
-    def test_summary_cards(self, analysis_data, breakpoint_data,
-                           reflection_meta):
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+    def test_summary_cards(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert "10" in html  # turn count
         assert "25" in html  # tool calls
         assert "85" in html  # first-response acceptance (85%)
 
-    def test_cache_hit_uses_correct_denominator(self, breakpoint_data,
-                                                 reflection_meta):
+    def test_cache_hit_uses_correct_denominator(self):
         """Cache hit should be cache_read / (input + cache_read + cache_creation)."""
         data = _make_analysis_data()
         data["token_stats"] = {
@@ -313,127 +369,178 @@ class TestGenerateSessionHtml:
             "total_cache_read": 9000000,
             "total_cache_creation": 400000,
         }
-        html = dashboard.generate_session_html(
-            data, breakpoint_data, reflection_meta, "test-project")
+        ref = _make_reflection()
+        html = dashboard.generate_reflection_html(data, ref, "test-project")
         # Correct: 9000000 / (10000 + 9000000 + 400000) = 95.6% -> rounds to 96%
-        # Bug would give: 9000000 / 10000 * 100 = 90000%
         assert "90000%" not in html
         assert "96%" in html
 
-    def test_dominant_agency_label(self, breakpoint_data, reflection_meta):
+    def test_dominant_agency_label(self):
         """Dominant agency should display 'Let's' not 'lets'."""
         data = _make_analysis_data()
         data["prompt_linguistics"]["agency_framing"]["dominant"] = "lets"
-        html = dashboard.generate_session_html(
-            data, breakpoint_data, reflection_meta, "test-project")
+        ref = _make_reflection()
+        html = dashboard.generate_reflection_html(data, ref, "test-project")
         assert "Let&#x27;s</strong>" in html or "Let's</strong>" in html
-        # Raw key should not appear as the display value
         assert ">lets</strong>" not in html
 
-    def test_token_breakdown_split_charts(self, analysis_data, breakpoint_data,
-                                           reflection_meta):
+    def test_token_breakdown_split_charts(self, analysis_data, reflection_data):
         """Token breakdown should have separate Input/Output and Cache charts."""
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         assert "Input / Output" in html
         assert "Cache" in html
 
-    def test_tool_scatter_has_percent(self, analysis_data, breakpoint_data,
-                                      reflection_meta):
+    def test_tool_scatter_has_percent(self, analysis_data, reflection_data):
         """Tool scatter values should display with % suffix."""
-        html = dashboard.generate_session_html(
-            analysis_data, breakpoint_data, reflection_meta, "test-project")
-        # Tool scatter section should use progress bars which include %
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
         scatter_section = html.split("Tool Scatter")[1].split("<h2>")[0]
         assert "%" in scatter_section
+
+    def test_no_loops_skips_section(self, analysis_data):
+        ref = _make_reflection(loops=[])
+        html = dashboard.generate_reflection_html(
+            analysis_data, ref, "test-project")
+        assert "Methodology Loops" not in html
+
+
+# --- Tests: Backward compatibility (old session API) ---
+
+class TestBackwardCompatSessionApi:
+
+    def test_generate_session_html_still_works(self, analysis_data):
+        bp = {"id": 2, "timestamp": "2025-02-13T16:00:00+00:00", "note": "End"}
+        ref_meta = {"id": 1, "timestamp": "2025-02-13T16:05:00+00:00"}
+        html = dashboard.generate_session_html(
+            analysis_data, bp, ref_meta, "test-project")
+        assert "<!DOCTYPE html>" in html
+        assert "Tool Usage" in html
+
+    def test_write_session_dashboard_still_works(self, project, analysis_data):
+        bp = {"id": 2, "timestamp": "2025-02-13T16:00:00+00:00", "note": "End"}
+        ref_meta = {"id": 1, "timestamp": "2025-02-13T16:05:00+00:00"}
+        path = dashboard.write_session_dashboard(
+            project, 2, analysis_data, bp, ref_meta)
+        assert path.exists()
+        assert "<!DOCTYPE html>" in path.read_text()
 
 
 # --- Tests: Index dashboard ---
 
 class TestGenerateIndexHtml:
 
-    def test_lists_breakpoints(self):
-        breakpoints = [
-            {"id": 1, "timestamp": "2025-02-13T14:00:00+00:00", "note": "Start"},
-            {"id": 2, "timestamp": "2025-02-13T16:00:00+00:00", "note": "End"},
-        ]
-        html = dashboard.generate_index_html(breakpoints, [], [], "test-project")
-        assert "1" in html
-        assert "2" in html
-        assert "Start" in html
-        assert "End" in html
-
-    def test_links_reflected_breakpoints(self):
-        breakpoints = [
-            {"id": 1, "timestamp": "2025-02-13T14:00:00+00:00", "note": ""},
-            {"id": 2, "timestamp": "2025-02-13T16:00:00+00:00", "note": ""},
-        ]
+    def test_lists_reflections(self):
         reflections = [
-            {"id": 1, "breakpoint_id": 2, "timestamp": "2025-02-13T16:05:00+00:00"},
+            {"id": 1, "timestamp": "2025-02-13T16:05:00+00:00",
+             "breakpoint_id": 1, "git_summary": "3 commits",
+             "prompt_count": 14, "loops": ["A \u2192 B"]},
+        ]
+        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        assert "3 commits" in html
+        assert "14" in html
+        assert "1 loop" in html
+
+    def test_links_reflections_to_dashboards(self):
+        reflections = [
+            {"id": 1, "timestamp": "2025-02-13T16:05:00+00:00",
+             "breakpoint_id": 2, "git_summary": "", "prompt_count": 0,
+             "loops": []},
         ]
         manifest = [
-            {"breakpoint_id": 2, "reflection_id": 1,
-             "html_path": "session-2.html"},
+            {"reflection_id": 1, "breakpoint_id": 2,
+             "html_path": "reflection-1.html"},
         ]
-        html = dashboard.generate_index_html(
-            breakpoints, reflections, manifest, "test-project")
-        assert "session-2.html" in html
+        html = dashboard.generate_index_html([], reflections, manifest, "test-project")
+        assert "reflection-1.html" in html
+        assert "View" in html
 
     def test_no_reflections(self):
-        breakpoints = [
-            {"id": 1, "timestamp": "2025-02-13T14:00:00+00:00", "note": "Only one"},
-        ]
-        html = dashboard.generate_index_html(breakpoints, [], [], "test-project")
-        assert "Only one" in html
+        html = dashboard.generate_index_html([], [], [], "test-project")
+        assert "0 reflections" in html
         assert "<!DOCTYPE html>" in html
 
     def test_singular_pluralization(self):
-        """'1 breakpoint' not '1 breakpoints'."""
-        breakpoints = [
-            {"id": 1, "timestamp": "2025-02-13T14:00:00+00:00", "note": ""},
-        ]
+        """'1 reflection' not '1 reflections'."""
         reflections = [
-            {"id": 1, "breakpoint_id": 1, "timestamp": "2025-02-13T14:05:00+00:00"},
+            {"id": 1, "breakpoint_id": 1, "timestamp": "2025-02-13T14:05:00+00:00",
+             "git_summary": "", "prompt_count": 0, "loops": []},
         ]
-        html = dashboard.generate_index_html(breakpoints, reflections, [], "test-project")
-        assert "1 breakpoint " in html or "1 breakpoint&" in html
+        html = dashboard.generate_index_html([], reflections, [], "test-project")
         assert "1 reflection" in html
-        assert "1 breakpoints" not in html
         assert "1 reflections" not in html
 
     def test_plural_pluralization(self):
-        """'2 breakpoints' not '2 breakpoint'."""
-        breakpoints = [
-            {"id": 1, "timestamp": "t1", "note": ""},
-            {"id": 2, "timestamp": "t2", "note": ""},
+        """'2 reflections' not '2 reflection'."""
+        reflections = [
+            {"id": 1, "timestamp": "t1", "breakpoint_id": 1,
+             "git_summary": "", "prompt_count": 0, "loops": []},
+            {"id": 2, "timestamp": "t2", "breakpoint_id": 2,
+             "git_summary": "", "prompt_count": 0, "loops": []},
         ]
-        html = dashboard.generate_index_html(breakpoints, [], [], "test-project")
-        assert "2 breakpoints" in html
+        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        assert "2 reflections" in html
+
+    def test_loops_link_to_reflection_pages(self):
+        reflections = [
+            {"id": 1, "timestamp": "2025-02-13T16:05:00+00:00",
+             "breakpoint_id": 2, "git_summary": "", "prompt_count": 0,
+             "loops": ["A \u2192 B"]},
+        ]
+        manifest = [
+            {"reflection_id": 1, "breakpoint_id": 2,
+             "html_path": "reflection-1.html"},
+        ]
+        loops = [
+            {"loop": "A \u2192 B", "reflection_id": 1,
+             "timestamp": "2025-02-13T16:05:00+00:00", "breakpoint_id": 2},
+        ]
+        html = dashboard.generate_index_html(
+            [], reflections, manifest, "test-project", loops=loops)
+        assert "loop-card" in html
+        assert 'href="reflection-1.html"' in html
+        assert "A \u2192 B" in html or "A &#x2192; B" in html or "A →" in html
+
+    def test_loops_without_dashboard_not_linked(self):
+        loops = [
+            {"loop": "X \u2192 Y", "reflection_id": 99,
+             "timestamp": "2025-02-13T16:05:00+00:00", "breakpoint_id": 2},
+        ]
+        html = dashboard.generate_index_html([], [], [], "test-project", loops=loops)
+        assert "href=" not in html.split("Methodology Loops")[1].split("<h2>")[0]
 
     def test_valid_html(self):
         html = dashboard.generate_index_html([], [], [], "test-project")
         assert html.strip().startswith("<!DOCTYPE html>")
         assert "</html>" in html
 
+    def test_loop_count_in_reflections_table(self):
+        reflections = [
+            {"id": 1, "timestamp": "2025-02-13T16:05:00+00:00",
+             "breakpoint_id": 1, "git_summary": "",
+             "prompt_count": 10, "loops": ["A", "B", "C"]},
+        ]
+        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        assert "3 loops" in html
+
 
 # --- Tests: File write functions ---
 
 class TestWriteDashboards:
 
-    def test_write_session_dashboard_creates_file(
-            self, project, analysis_data, breakpoint_data, reflection_meta,
-            tmp_path):
-        path = dashboard.write_session_dashboard(
-            project, 2, analysis_data, breakpoint_data, reflection_meta)
+    def test_write_reflection_dashboard_creates_file(
+            self, project, analysis_data, reflection_data):
+        path = dashboard.write_reflection_dashboard(
+            project, 1, analysis_data, reflection_data)
         assert path.exists()
         content = path.read_text()
         assert "<!DOCTYPE html>" in content
 
-    def test_write_session_dashboard_path_format(
-            self, project, analysis_data, breakpoint_data, reflection_meta):
-        path = dashboard.write_session_dashboard(
-            project, 5, analysis_data, breakpoint_data, reflection_meta)
-        assert path.name == "session-5.html"
+    def test_write_reflection_dashboard_path_format(
+            self, project, analysis_data, reflection_data):
+        path = dashboard.write_reflection_dashboard(
+            project, 5, analysis_data, reflection_data)
+        assert path.name == "reflection-5.html"
 
     def test_write_index_dashboard_creates_file(self, project, tmp_path):
         path = dashboard.write_index_dashboard(project, [], [], [])
@@ -442,15 +549,16 @@ class TestWriteDashboards:
         assert "<!DOCTYPE html>" in content
 
     def test_write_index_dashboard_overwrites(self, project):
+        reflections_v1 = [
+            {"id": 1, "timestamp": "t1", "breakpoint_id": 1,
+             "git_summary": "v1", "prompt_count": 0, "loops": []}]
+        reflections_v2 = [
+            {"id": 1, "timestamp": "t1", "breakpoint_id": 1,
+             "git_summary": "v2", "prompt_count": 0, "loops": []}]
         path1 = dashboard.write_index_dashboard(
-            project,
-            [{"id": 1, "timestamp": "2025-01-01T00:00:00+00:00", "note": "v1"}],
-            [], [])
-        content1 = path1.read_text()
+            project, [], reflections_v1, [])
         path2 = dashboard.write_index_dashboard(
-            project,
-            [{"id": 1, "timestamp": "2025-01-01T00:00:00+00:00", "note": "v2"}],
-            [], [])
+            project, [], reflections_v2, [])
         content2 = path2.read_text()
         assert path1 == path2
         assert "v2" in content2
@@ -460,19 +568,33 @@ class TestWriteDashboards:
 
 class TestCLI:
 
-    def test_cli_session_command(self, monkeypatch, capsys, project,
-                                 analysis_data, breakpoint_data,
-                                 reflection_meta):
+    def test_cli_reflection_command(self, monkeypatch, capsys, project,
+                                     analysis_data, reflection_data):
         import io
         stdin_data = json.dumps({
             "analysis": analysis_data,
-            "breakpoint": breakpoint_data,
-            "reflection": reflection_meta,
+            "reflection": reflection_data,
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_data))
+        monkeypatch.setattr("sys.argv",
+                          ["dashboard_generator.py", "reflection", project,
+                           "1", "--stdin"])
+        dashboard.main()
+        output = json.loads(capsys.readouterr().out)
+        assert "path" in output
+        assert "reflection-1" in output["path"]
+
+    def test_cli_session_alias_still_works(self, monkeypatch, capsys, project,
+                                            analysis_data, reflection_data):
+        import io
+        stdin_data = json.dumps({
+            "analysis": analysis_data,
+            "reflection": reflection_data,
         })
         monkeypatch.setattr("sys.stdin", io.StringIO(stdin_data))
         monkeypatch.setattr("sys.argv",
                           ["dashboard_generator.py", "session", project,
-                           "2", "--stdin"])
+                           "1", "--stdin"])
         dashboard.main()
         output = json.loads(capsys.readouterr().out)
         assert "path" in output

@@ -4,18 +4,19 @@ dashboard_generator — pure-CSS HTML dashboard renderer for confessional reflec
 
 Generates self-contained HTML files with no external dependencies (no JS, no CDN).
 Two output types:
-  - Session dashboard: visualizes a single breakpoint window's analysis data
-  - Index dashboard: lists all breakpoints and links to reflected sessions
+  - Reflection dashboard: visualizes a single reflection's analysis data, loops, and text
+  - Index dashboard: lists all reflections and links to their dashboards
 
 Storage layout:
   ~/.reflection/projects/<project>/dashboards/
-    session-<breakpoint_id>.html
+    reflection-<reflection_id>.html
     index.html
     manifest.jsonl
 """
 
 import html
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -188,6 +189,42 @@ a:hover { text-decoration: underline; }
 .indicator { font-size: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 3px; }
 .indicator.positive { background: rgba(46, 204, 113, 0.15); color: var(--success); }
 .indicator.neutral { background: rgba(139, 139, 139, 0.15); color: var(--text-muted); }
+
+/* Loop cards grid */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.loop-card {
+    background: var(--card);
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-decoration: none;
+    display: block;
+    transition: background 0.15s;
+}
+.loop-card:hover { background: var(--surface); text-decoration: none; }
+.loop-value { font-size: 1rem; font-weight: bold; color: var(--accent); margin-bottom: 0.25rem; }
+.loop-label { font-size: 0.75rem; color: var(--text-muted); }
+
+/* Reflection text */
+.reflection-text {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 1.25rem;
+    font-size: 0.85rem;
+    line-height: 1.7;
+}
+.reflection-text h1 { font-size: 1.2rem; margin: 1.25rem 0 0.5rem; border-bottom: none; }
+.reflection-text h2 { font-size: 1.05rem; margin: 1.25rem 0 0.5rem; border-bottom: none; }
+.reflection-text h3 { font-size: 0.9rem; margin: 1rem 0 0.4rem; color: var(--text); }
+.reflection-text p { margin: 0.5rem 0; }
+.reflection-text ul, .reflection-text ol { margin: 0.4rem 0 0.4rem 1.5rem; }
+.reflection-text li { margin-bottom: 0.25rem; }
+.reflection-text strong { color: var(--accent); }
+.reflection-text code { background: var(--card); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.8rem; }
 """
 
 
@@ -279,10 +316,85 @@ def _section_html(title, content):
     return f'<h2>{html.escape(title)}</h2>\n{content}'
 
 
-# --- Session dashboard ---
+def _markdown_to_html(text):
+    """Convert basic markdown to HTML. Handles headers, bold, lists, paragraphs."""
+    lines = text.split('\n')
+    result = []
+    in_list = False
 
-def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
-    """Generate a complete session dashboard HTML string."""
+    for line in lines:
+        stripped = line.strip()
+
+        # Close list if we're no longer in one
+        if in_list and not stripped.startswith('- '):
+            result.append('</ul>')
+            in_list = False
+
+        # Headers
+        if stripped.startswith('### '):
+            result.append(f'<h3>{html.escape(stripped[4:])}</h3>')
+        elif stripped.startswith('## '):
+            header_text = stripped[3:]
+            # Handle bold in headers: ## N. **Title**
+            header_text = re.sub(
+                r'\*\*(.+?)\*\*',
+                lambda m: f'<strong>{html.escape(m.group(1))}</strong>',
+                header_text)
+            # Escape parts outside of tags
+            parts = re.split(r'(<strong>.*?</strong>)', header_text)
+            escaped = ''.join(
+                p if p.startswith('<strong>') else html.escape(p)
+                for p in parts)
+            result.append(f'<h2>{escaped}</h2>')
+        elif stripped.startswith('# '):
+            result.append(f'<h1>{html.escape(stripped[2:])}</h1>')
+        # List items
+        elif stripped.startswith('- '):
+            if not in_list:
+                result.append('<ul>')
+                in_list = True
+            item_text = _inline_markdown(stripped[2:])
+            result.append(f'<li>{item_text}</li>')
+        # Empty line = paragraph break
+        elif stripped == '':
+            continue
+        # Regular text
+        else:
+            result.append(f'<p>{_inline_markdown(stripped)}</p>')
+
+    if in_list:
+        result.append('</ul>')
+
+    return '\n'.join(result)
+
+
+def _inline_markdown(text):
+    """Convert inline markdown (bold, code) to HTML."""
+    # Code spans first (so bold inside code isn't processed)
+    text = re.sub(r'`([^`]+)`',
+                  lambda m: f'<code>{html.escape(m.group(1))}</code>', text)
+    # Bold
+    text = re.sub(r'\*\*(.+?)\*\*',
+                  lambda m: f'<strong>{html.escape(m.group(1))}</strong>', text)
+    # Escape remaining text that isn't already in tags
+    parts = re.split(r'(<(?:strong|code)>.*?</(?:strong|code)>)', text)
+    result = ''.join(
+        p if p.startswith(('<strong>', '<code>')) else html.escape(p)
+        for p in parts)
+    return result
+
+
+# --- Reflection dashboard ---
+
+def generate_reflection_html(analysis_data, reflection, project):
+    """Generate a complete reflection dashboard HTML string.
+
+    Args:
+        analysis_data: Transcript analysis dict (tool_stats, token_stats, etc.)
+        reflection: Full reflection entry dict (id, timestamp, reflection text,
+                    loops, git_summary, prompt_count, breakpoint_id)
+        project: Project name string
+    """
     tool_stats = analysis_data.get("tool_stats", {})
     token_stats = analysis_data.get("token_stats", {})
     linguistics = analysis_data.get("prompt_linguistics", {})
@@ -296,8 +408,10 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
     total_all_input = total_input + cache_read + cache_creation
     cache_hit = round(cache_read / total_all_input * 100) if total_all_input > 0 else 0
 
-    bp_ts = breakpoint.get("timestamp", "")
-    bp_note = breakpoint.get("note", "")
+    ref_id = reflection.get("id", "?")
+    ref_ts = reflection.get("timestamp", "")
+    ref_date = ref_ts[:10] if len(ref_ts) >= 10 else ref_ts
+    git_summary = reflection.get("git_summary", "")
 
     parts = []
 
@@ -305,10 +419,24 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
     parts.append(f'<h1>{html.escape(project)}</h1>')
     parts.append(
         f'<div class="subtitle">'
-        f'Breakpoint #{breakpoint.get("id", "?")} &mdash; {html.escape(bp_ts)}'
-        f'{(" &mdash; " + html.escape(bp_note)) if bp_note else ""}'
+        f'Reflection #{ref_id} &mdash; {html.escape(ref_date)}'
+        f'{(" &mdash; " + html.escape(git_summary)) if git_summary else ""}'
         f'</div>'
     )
+
+    # Methodology Loops
+    loops = reflection.get("loops", [])
+    if loops:
+        loop_items = []
+        for loop_text in loops:
+            loop_items.append(
+                f'<div class="card">'
+                f'<div class="loop-value">{html.escape(loop_text)}</div>'
+                f'</div>'
+            )
+        parts.append(_section_html(
+            "Methodology Loops",
+            f'<div class="grid">{"".join(loop_items)}</div>'))
 
     # Summary cards
     cards = [
@@ -467,88 +595,111 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
         + '<h3>Cache</h3>'
         + _bar_chart_html(cache_items)))
 
+    # Full reflection text
+    reflection_text = reflection.get("reflection", "")
+    if reflection_text:
+        rendered = _markdown_to_html(reflection_text)
+        parts.append(_section_html(
+            "Full Reflection",
+            f'<div class="reflection-text">{rendered}</div>'))
+
     body = "\n".join(parts)
-    return _wrap_html(f"{project} — Session Dashboard", body)
+    return _wrap_html(f"{project} — Reflection #{ref_id}", body)
+
+
+# Backward-compatible alias
+def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
+    """Deprecated: use generate_reflection_html instead."""
+    reflection = dict(reflection_meta)
+    reflection.setdefault("loops", [])
+    reflection.setdefault("reflection", "")
+    reflection.setdefault("git_summary", "")
+    return generate_reflection_html(analysis_data, reflection, project)
 
 
 # --- Index dashboard ---
 
 def generate_index_html(breakpoints, reflections, manifest, project, loops=None):
     """Generate the master index dashboard HTML string."""
-    # Build lookup: breakpoint_id -> reflection
-    reflected_ids = set()
-    for ref in reflections:
-        bp_id = ref.get("breakpoint_id")
-        if bp_id is not None:
-            reflected_ids.add(bp_id)
-
-    # Build lookup: breakpoint_id -> html_path
+    # Build lookup: reflection_id -> html_path
     dashboard_paths = {}
     for entry in manifest:
-        dashboard_paths[entry["breakpoint_id"]] = entry["html_path"]
+        dashboard_paths[entry.get("reflection_id")] = entry["html_path"]
+
+    ref_count = len(reflections)
+    ref_word = "reflection" if ref_count == 1 else "reflections"
 
     parts = []
     parts.append(f'<h1>{html.escape(project)}</h1>')
-    bp_count = len(breakpoints)
-    ref_count = len(reflections)
-    bp_word = "breakpoint" if bp_count == 1 else "breakpoints"
-    ref_word = "reflection" if ref_count == 1 else "reflections"
-    parts.append(
-        f'<div class="subtitle">'
-        f'{bp_count} {bp_word} &mdash; '
-        f'{ref_count} {ref_word}'
-        f'</div>')
+    parts.append(f'<div class="subtitle">{ref_count} {ref_word}</div>')
 
-    # Methodology Loops section
+    # Methodology Loops section — cards link to reflection pages
     if loops:
         loop_items = []
         for entry in loops:
             ts = entry.get("timestamp", "")
             date = ts[:10] if len(ts) >= 10 else ts
             ref_id = entry.get("reflection_id", "?")
-            loop_items.append(
-                f'<div class="card">'
-                f'<div class="metric-value">{html.escape(entry["loop"])}</div>'
-                f'<div class="metric-label">Reflection #{ref_id} &mdash; {html.escape(date)}</div>'
-                f'</div>'
-            )
+            html_path = dashboard_paths.get(ref_id)
+            if html_path:
+                loop_items.append(
+                    f'<a class="loop-card" href="{html.escape(html_path)}">'
+                    f'<div class="loop-value">{html.escape(entry["loop"])}</div>'
+                    f'<div class="loop-label">Reflection #{ref_id} &mdash; {html.escape(date)}</div>'
+                    f'</a>'
+                )
+            else:
+                loop_items.append(
+                    f'<div class="loop-card">'
+                    f'<div class="loop-value">{html.escape(entry["loop"])}</div>'
+                    f'<div class="loop-label">Reflection #{ref_id} &mdash; {html.escape(date)}</div>'
+                    f'</div>'
+                )
         loops_html = f'<div class="grid">{"".join(loop_items)}</div>'
         parts.append(_section_html("Methodology Loops", loops_html))
 
-    # Breakpoint table
+    # Reflections table
     rows = []
-    for bp in breakpoints:
-        bp_id = bp["id"]
-        is_reflected = bp_id in reflected_ids
-        html_path = dashboard_paths.get(bp_id)
+    for ref in reflections:
+        ref_id = ref["id"]
+        ts = ref.get("timestamp", "")
+        date = ts[:10] if len(ts) >= 10 else ts
+        git_summary = ref.get("git_summary", "")
+        prompt_count = ref.get("prompt_count", 0)
+        ref_loops = ref.get("loops", [])
+        loop_count = len(ref_loops)
+        html_path = dashboard_paths.get(ref_id)
 
-        if is_reflected and html_path:
-            status = f'<a href="{html.escape(html_path)}">View Dashboard</a>'
-        elif is_reflected:
-            status = '<span class="status-yes">Reflected</span>'
+        if html_path:
+            view = f'<a href="{html.escape(html_path)}">View</a>'
         else:
-            status = '<span class="status-no">&mdash;</span>'
+            view = '<span class="status-no">&mdash;</span>'
+
+        loops_cell = f'{loop_count} loop{"s" if loop_count != 1 else ""}'
 
         rows.append(
             f'<tr>'
-            f'<td>{bp_id}</td>'
-            f'<td>{html.escape(bp.get("timestamp", ""))}</td>'
-            f'<td>{html.escape(bp.get("note", ""))}</td>'
-            f'<td>{status}</td>'
+            f'<td>{ref_id}</td>'
+            f'<td>{html.escape(date)}</td>'
+            f'<td>{html.escape(git_summary)}</td>'
+            f'<td>{prompt_count}</td>'
+            f'<td>{loops_cell}</td>'
+            f'<td>{view}</td>'
             f'</tr>'
         )
 
     table = (
         '<table><thead><tr>'
-        '<th>ID</th><th>Timestamp</th><th>Note</th><th>Status</th>'
+        '<th>ID</th><th>Date</th><th>Git Summary</th>'
+        '<th>Prompts</th><th>Loops</th><th></th>'
         '</tr></thead><tbody>'
         + "\n".join(rows)
         + '</tbody></table>'
     )
-    parts.append(_section_html("Breakpoints", table))
+    parts.append(_section_html("Reflections", table))
 
     body = "\n".join(parts)
-    return _wrap_html(f"{project} — Dashboard Index", body)
+    return _wrap_html(f"{project} — Confessional", body)
 
 
 # --- HTML wrapper ---
@@ -573,16 +724,26 @@ def _wrap_html(title, body):
 
 # --- File writers ---
 
-def write_session_dashboard(project, breakpoint_id, analysis_data,
-                            breakpoint, reflection_meta):
-    """Write a session dashboard HTML file. Returns the file Path."""
+def write_reflection_dashboard(project, reflection_id, analysis_data, reflection):
+    """Write a reflection dashboard HTML file. Returns the file Path."""
     dashboards_dir = store._dashboards_dir(project)
     dashboards_dir.mkdir(parents=True, exist_ok=True)
-    path = dashboards_dir / f"session-{breakpoint_id}.html"
-    content = generate_session_html(
-        analysis_data, breakpoint, reflection_meta, project)
+    path = dashboards_dir / f"reflection-{reflection_id}.html"
+    content = generate_reflection_html(analysis_data, reflection, project)
     path.write_text(content, encoding="utf-8")
     return path
+
+
+# Backward-compatible alias
+def write_session_dashboard(project, breakpoint_id, analysis_data,
+                            breakpoint, reflection_meta):
+    """Deprecated: use write_reflection_dashboard instead."""
+    reflection = dict(reflection_meta)
+    reflection.setdefault("loops", [])
+    reflection.setdefault("reflection", "")
+    reflection.setdefault("git_summary", "")
+    ref_id = reflection.get("id", breakpoint_id)
+    return write_reflection_dashboard(project, ref_id, analysis_data, reflection)
 
 
 def write_index_dashboard(project, breakpoints, reflections, manifest, loops=None):
@@ -600,7 +761,7 @@ def write_index_dashboard(project, breakpoints, reflections, manifest, loops=Non
 def main():
     if len(sys.argv) < 3:
         print("Usage: dashboard_generator.py <command> <project> [args...] [--stdin]")
-        print("Commands: session, index")
+        print("Commands: reflection, index")
         sys.exit(1)
 
     use_stdin = "--stdin" in sys.argv
@@ -609,21 +770,20 @@ def main():
     command = argv[1]
     project = argv[2]
 
-    if command == "session":
-        breakpoint_id = int(argv[3]) if len(argv) > 3 else 1
+    if command in ("reflection", "session"):
+        reflection_id = int(argv[3]) if len(argv) > 3 else 1
         if use_stdin:
             if hasattr(sys.stdin, "buffer"):
                 data = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="surrogatepass"))
             else:
                 data = json.loads(sys.stdin.read())
         else:
-            print(json.dumps({"error": "session command requires --stdin"}))
+            print(json.dumps({"error": "reflection command requires --stdin"}))
             sys.exit(1)
         analysis = data["analysis"]
-        bp = data["breakpoint"]
-        ref_meta = data["reflection"]
-        path = write_session_dashboard(
-            project, breakpoint_id, analysis, bp, ref_meta)
+        reflection = data["reflection"]
+        path = write_reflection_dashboard(
+            project, reflection_id, analysis, reflection)
         print(json.dumps({"path": str(path)}))
 
     elif command == "index":

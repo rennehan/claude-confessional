@@ -160,11 +160,11 @@ Present the full reflection to the user.
 
 ### 5. Generate Dashboards
 
-Generate the session HTML dashboard using the transcript analysis data gathered in Step 1. Pass the analysis data, breakpoint, and reflection metadata via stdin as JSON:
+Generate the reflection HTML dashboard using the transcript analysis data gathered in Step 1. Pass the analysis data and the full reflection entry (including text and loops) via stdin as JSON:
 
 ```bash
-python3 ~/.claude/scripts/dashboard_generator.py session "$PROJECT" "<breakpoint_id>" --stdin <<'DASHBOARD_EOF'
-{"analysis": <analysis_json>, "breakpoint": <breakpoint_json>, "reflection": {"id": <reflection_id>, "timestamp": "<timestamp>"}}
+python3 ~/.claude/scripts/dashboard_generator.py reflection "$PROJECT" "<reflection_id>" --stdin <<'DASHBOARD_EOF'
+{"analysis": <analysis_json>, "reflection": {"id": <reflection_id>, "timestamp": "<timestamp>", "reflection": "<reflection_text>", "loops": [<loops_array>], "git_summary": "<git_summary>", "prompt_count": <prompt_count>, "breakpoint_id": <breakpoint_id>}}
 DASHBOARD_EOF
 ```
 
@@ -179,7 +179,7 @@ python3 ~/.claude/scripts/dashboard_generator.py index "$PROJECT"
 ```
 
 Report the dashboard paths to the user:
-- Session dashboard: `<session_html_path>`
+- Reflection dashboard: `<reflection_html_path>`
 - Master index: `<index_html_path>`
 
 ### 6. Create Post-Reflection Breakpoint
