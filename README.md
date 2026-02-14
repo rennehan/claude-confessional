@@ -56,13 +56,15 @@ Mark the end of a work session. Optionally attach a note:
 /breakpoint Finished the auth refactor.
 ```
 
-Breakpoints are also **created automatically** — a system hook fires on every SessionStart and inserts a breakpoint if your last session in that project was more than 4 hours ago. So if you forget to `/breakpoint` at the end of a session, the next session will pick up the boundary for you.
+Breakpoints are also **created automatically** — a system hook fires on every SessionStart and inserts a breakpoint if your last session in that project was more than 4 hours ago. So if you forget to `/breakpoint` at the end of a session, the next session will pick up the boundary for you. Note: sessions less than 4 hours apart do **not** trigger an auto-breakpoint — use `/breakpoint` manually if you want a boundary between closely-spaced sessions.
 
 ### `/reflect` — Analyze Your Methodology
 
 Claude reads every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
 
 If you have enough breakpoint history (3+), you'll be prompted to choose how far back to reflect — just the last session, or a wider arc spanning multiple sessions. This lets you zoom out and see how your methodology evolves over a longer stretch of work.
+
+After the reflection is complete, `/reflect` automatically creates a new breakpoint so your next session starts fresh. You never need to manually `/breakpoint` after reflecting.
 
 The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
 

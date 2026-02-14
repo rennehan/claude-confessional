@@ -179,3 +179,13 @@ python3 ~/.claude/scripts/dashboard_generator.py index "$PROJECT"
 Report the dashboard paths to the user:
 - Session dashboard: `<session_html_path>`
 - Master index: `<index_html_path>`
+
+### 6. Create Post-Reflection Breakpoint
+
+Automatically create a new breakpoint so the next session starts fresh:
+
+```bash
+python3 ~/.claude/scripts/confessional_store.py breakpoint "$PROJECT" "Post-reflection breakpoint"
+```
+
+Report to the user that a new breakpoint has been set.
