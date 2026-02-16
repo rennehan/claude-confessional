@@ -25,6 +25,20 @@ import confessional_store as store
 # --- CSS ---
 
 THEMES = {
+    "claude code": {
+        "bg": "#1a1a1a", "surface": "#222222", "card": "#2a2a2a",
+        "text": "#d4d4d4", "text-muted": "#737373", "accent": "#e07a3a",
+        "bar-1": "#e07a3a", "bar-2": "#d4a27a", "bar-3": "#6bab6b",
+        "bar-4": "#e0a848", "bar-5": "#7a9ec0",
+        "success": "#6bab6b", "warning": "#e0a848", "border": "#333333",
+    },
+    "church of claude": {
+        "bg": "#140a18", "surface": "#1e1024", "card": "#2a1430",
+        "text": "#e8d8f0", "text-muted": "#9a80a8", "accent": "#cfb53b",
+        "bar-1": "#722f6b", "bar-2": "#cfb53b", "bar-3": "#8b2242",
+        "bar-4": "#2e5090", "bar-5": "#c8a882",
+        "success": "#cfb53b", "warning": "#8b2242", "border": "#3a1e44",
+    },
     "midnight": {
         "bg": "#1a1a2e", "surface": "#16213e", "card": "#0f3460",
         "text": "#e0e0e0", "text-muted": "#8b8b8b", "accent": "#e94560",
@@ -88,16 +102,9 @@ THEMES = {
         "bar-4": "#a83232", "bar-5": "#8a7068",
         "success": "#e8a030", "warning": "#ff6b35", "border": "#3a2020",
     },
-    "claude code": {
-        "bg": "#1a1a1a", "surface": "#222222", "card": "#2a2a2a",
-        "text": "#d4d4d4", "text-muted": "#737373", "accent": "#e07a3a",
-        "bar-1": "#e07a3a", "bar-2": "#d4a27a", "bar-3": "#6bab6b",
-        "bar-4": "#e0a848", "bar-5": "#7a9ec0",
-        "success": "#6bab6b", "warning": "#e0a848", "border": "#333333",
-    },
 }
 
-DEFAULT_THEME = "midnight"
+DEFAULT_THEME = "claude code"
 
 
 def _theme_css_vars(theme_name=None):
