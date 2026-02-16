@@ -110,12 +110,25 @@ def _theme_css_vars(theme_name=None):
 
 
 THEME_SELECTOR_CSS = """
-/* Theme selector */
+/* Page header with theme selector */
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.25rem;
+}
+.page-header h1 { margin-bottom: 0; }
 .theme-selector {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+.theme-selector label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 .theme-selector select {
     background: var(--card);
@@ -145,6 +158,7 @@ def _theme_selector_html():
     themes_json = json.dumps(THEMES, separators=(",", ":"))
 
     return f"""<div class="theme-selector">
+<label for="theme-select">Select Theme:</label>
 <select id="theme-select" aria-label="Color theme">
 {options_html}
 </select>
@@ -544,8 +558,14 @@ def generate_reflection_html(analysis_data, reflection, project):
 
     parts = []
 
-    # Header
-    parts.append(f'<h1>{html.escape(project)}</h1>')
+    # Header with theme selector
+    selector = _theme_selector_html()
+    parts.append(
+        f'<div class="page-header">'
+        f'<h1>{html.escape(project)}</h1>'
+        f'{selector}'
+        f'</div>'
+    )
     parts.append(
         f'<div class="subtitle">'
         f'Reflection #{ref_id} &mdash; {html.escape(ref_date)}'
@@ -759,7 +779,13 @@ def generate_index_html(reflections, manifest, project, loops=None):
     ref_word = "reflection" if ref_count == 1 else "reflections"
 
     parts = []
-    parts.append(f'<h1>{html.escape(project)}</h1>')
+    selector = _theme_selector_html()
+    parts.append(
+        f'<div class="page-header">'
+        f'<h1>{html.escape(project)}</h1>'
+        f'{selector}'
+        f'</div>'
+    )
     parts.append(f'<div class="subtitle">{ref_count} {ref_word}</div>')
 
     # Methodology Loops section — cards link to reflection pages
@@ -835,7 +861,6 @@ def generate_index_html(reflections, manifest, project, loops=None):
 
 def _wrap_html(title, body):
     """Wrap body content in a full HTML document."""
-    selector = _theme_selector_html()
     return (
         f'<!DOCTYPE html>\n'
         f'<html lang="en">\n'
@@ -846,7 +871,6 @@ def _wrap_html(title, body):
         f'<style>{CSS_STYLES}</style>\n'
         f'</head>\n'
         f'<body>\n'
-        f'{selector}\n'
         f'{body}\n'
         f'</body>\n'
         f'</html>\n'
