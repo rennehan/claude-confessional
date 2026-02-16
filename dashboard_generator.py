@@ -619,7 +619,7 @@ def generate_session_html(analysis_data, breakpoint, reflection_meta, project):
 
 # --- Index dashboard ---
 
-def generate_index_html(breakpoints, reflections, manifest, project, loops=None):
+def generate_index_html(reflections, manifest, project, loops=None):
     """Generate the master index dashboard HTML string."""
     # Build lookup: reflection_id -> html_path
     dashboard_paths = {}
@@ -746,12 +746,12 @@ def write_session_dashboard(project, breakpoint_id, analysis_data,
     return write_reflection_dashboard(project, ref_id, analysis_data, reflection)
 
 
-def write_index_dashboard(project, breakpoints, reflections, manifest, loops=None):
+def write_index_dashboard(project, reflections, manifest, loops=None):
     """Write/overwrite the index dashboard HTML file. Returns the file Path."""
     dashboards_dir = store._dashboards_dir(project)
     dashboards_dir.mkdir(parents=True, exist_ok=True)
     path = dashboards_dir / "index.html"
-    content = generate_index_html(breakpoints, reflections, manifest, project, loops)
+    content = generate_index_html(reflections, manifest, project, loops)
     path.write_text(content, encoding="utf-8")
     return path
 
@@ -787,12 +787,11 @@ def main():
         print(json.dumps({"path": str(path)}))
 
     elif command == "index":
-        breakpoints = store.get_all_breakpoints(project)
         reflections = store.get_reflections(project)
         manifest = store.get_dashboard_manifest(project)
         loops = store.get_all_loops(project)
         path = write_index_dashboard(
-            project, breakpoints, reflections, manifest, loops)
+            project, reflections, manifest, loops)
         print(json.dumps({"path": str(path)}))
 
     else:

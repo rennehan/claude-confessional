@@ -16,19 +16,14 @@ CWD=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PROJECT=$(basename "$CWD")
 ```
 
-Get the current breakpoint and all breakpoints:
+Get the current breakpoint:
 ```bash
 python3 ~/.claude/scripts/confessional_store.py get_current_breakpoint "$PROJECT"
-python3 ~/.claude/scripts/confessional_store.py get_all_breakpoints "$PROJECT"
 ```
 
-**Choose the reflection range.** If there are 3 or more breakpoints (current + at least 2 prior), use `AskUserQuestion` to let the user pick how far back to reflect. Present the most recent breakpoints (up to 5) as options:
-- Option 1: "Since last breakpoint" (default — the most recent breakpoint timestamp)
-- Option 2+: "Since breakpoint N: <note> (<date>)" for each earlier breakpoint
+Use the current breakpoint's timestamp as `<breakpoint_timestamp>` for all subsequent commands.
 
-Use the selected breakpoint's timestamp as `<breakpoint_timestamp>` for all subsequent commands. If there are fewer than 3 breakpoints, skip the prompt and use the current breakpoint timestamp (default behavior).
-
-Get all session data since the selected breakpoint (turns, tools, token metrics, session metadata):
+Get all session data since the current breakpoint (turns, tools, token metrics, session metadata):
 ```bash
 python3 ~/.claude/scripts/transcript_reader.py analyze "$CWD" "<breakpoint_timestamp>"
 ```
@@ -134,27 +129,26 @@ Write a reflection that captures the methodology, not the content. Structure it 
 8. **Session Economics** — Token usage, cache efficiency, cost-per-insight
 9. **Methodology Extract** — A concise, reusable description of this user's working style that could inform future sessions
 
+If the previous reflections summary (fetched in Step 1) contains any prior reflections, also include a 10th section:
+
+10. **Methodology Evolution** — Compare this session's patterns against prior reflections:
+    - How has the user's approach changed since earlier reflections?
+    - Are patterns becoming more refined or shifting direction?
+    - Any emerging meta-patterns across sessions
+    - What has the user learned about their own working style?
+
+**Important:** The complete reflection text — including the Methodology Evolution section if applicable — must be fully assembled before proceeding to Step 4. Everything the user sees must also be what gets stored.
+
 ### 4. Store and Present
 
 Extract the methodology loops from the reflection as short arrow-chain descriptions (e.g., `"Experience → Question → Direct → Ship"`). Include as many loops as were identified in the reflection.
 
-Store the reflection using `--stdin` with a heredoc to safely pass the reflection text. Pass the loops as a JSON array via `--loops`:
+Store the **complete** reflection (including all sections produced in Step 3) using `--stdin` with a heredoc to safely pass the reflection text. Pass the loops as a JSON array via `--loops`:
 ```bash
 python3 ~/.claude/scripts/confessional_store.py store_reflection "$PROJECT" "<git_summary>" <prompt_count> --stdin --loops '["Loop 1 → Step 2 → Step 3", "Another → Pattern"]' <<'CONFESSIONAL_EOF'
 <reflection_text>
 CONFESSIONAL_EOF
 ```
-
-Check if there are previous reflections:
-```bash
-python3 ~/.claude/scripts/confessional_store.py get_reflections "$PROJECT"
-```
-
-If previous reflections exist, also include a **Methodology Evolution** section:
-- How has the user's approach changed since earlier reflections?
-- Are patterns becoming more refined or shifting direction?
-- Any emerging meta-patterns across sessions
-- What has the user learned about their own working style?
 
 Present the full reflection to the user.
 

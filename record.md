@@ -23,7 +23,7 @@ python3 ~/.claude/scripts/confessional_store.py init "<project>"
 3. Confirm to the user:
    - Recording is now active for **<project>**
    - Conversation data is automatically captured by Claude Code
-   - Use `/breakpoint` (or `/amen`) to mark session boundaries
+   - Use `/amen` to close a session
    - Use `/reflect` (or `/sermon`) to analyze patterns
    - Recording persists across sessions until explicitly disabled
 

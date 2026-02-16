@@ -436,7 +436,7 @@ class TestGenerateIndexHtml:
              "breakpoint_id": 1, "git_summary": "3 commits",
              "prompt_count": 14, "loops": ["A \u2192 B"]},
         ]
-        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        html = dashboard.generate_index_html(reflections, [], "test-project")
         assert "3 commits" in html
         assert "14" in html
         assert "1 loop" in html
@@ -451,12 +451,12 @@ class TestGenerateIndexHtml:
             {"reflection_id": 1, "breakpoint_id": 2,
              "html_path": "reflection-1.html"},
         ]
-        html = dashboard.generate_index_html([], reflections, manifest, "test-project")
+        html = dashboard.generate_index_html(reflections, manifest, "test-project")
         assert "reflection-1.html" in html
         assert "View" in html
 
     def test_no_reflections(self):
-        html = dashboard.generate_index_html([], [], [], "test-project")
+        html = dashboard.generate_index_html([], [], "test-project")
         assert "0 reflections" in html
         assert "<!DOCTYPE html>" in html
 
@@ -466,7 +466,7 @@ class TestGenerateIndexHtml:
             {"id": 1, "breakpoint_id": 1, "timestamp": "2025-02-13T14:05:00+00:00",
              "git_summary": "", "prompt_count": 0, "loops": []},
         ]
-        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        html = dashboard.generate_index_html(reflections, [], "test-project")
         assert "1 reflection" in html
         assert "1 reflections" not in html
 
@@ -478,7 +478,7 @@ class TestGenerateIndexHtml:
             {"id": 2, "timestamp": "t2", "breakpoint_id": 2,
              "git_summary": "", "prompt_count": 0, "loops": []},
         ]
-        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        html = dashboard.generate_index_html(reflections, [], "test-project")
         assert "2 reflections" in html
 
     def test_loops_link_to_reflection_pages(self):
@@ -496,7 +496,7 @@ class TestGenerateIndexHtml:
              "timestamp": "2025-02-13T16:05:00+00:00", "breakpoint_id": 2},
         ]
         html = dashboard.generate_index_html(
-            [], reflections, manifest, "test-project", loops=loops)
+            reflections, manifest, "test-project", loops=loops)
         assert "loop-card" in html
         assert 'href="reflection-1.html"' in html
         assert "A \u2192 B" in html or "A &#x2192; B" in html or "A →" in html
@@ -506,11 +506,11 @@ class TestGenerateIndexHtml:
             {"loop": "X \u2192 Y", "reflection_id": 99,
              "timestamp": "2025-02-13T16:05:00+00:00", "breakpoint_id": 2},
         ]
-        html = dashboard.generate_index_html([], [], [], "test-project", loops=loops)
+        html = dashboard.generate_index_html([], [], "test-project", loops=loops)
         assert "href=" not in html.split("Methodology Loops")[1].split("<h2>")[0]
 
     def test_valid_html(self):
-        html = dashboard.generate_index_html([], [], [], "test-project")
+        html = dashboard.generate_index_html([], [], "test-project")
         assert html.strip().startswith("<!DOCTYPE html>")
         assert "</html>" in html
 
@@ -520,7 +520,7 @@ class TestGenerateIndexHtml:
              "breakpoint_id": 1, "git_summary": "",
              "prompt_count": 10, "loops": ["A", "B", "C"]},
         ]
-        html = dashboard.generate_index_html([], reflections, [], "test-project")
+        html = dashboard.generate_index_html(reflections, [], "test-project")
         assert "3 loops" in html
 
 
@@ -543,7 +543,7 @@ class TestWriteDashboards:
         assert path.name == "reflection-5.html"
 
     def test_write_index_dashboard_creates_file(self, project, tmp_path):
-        path = dashboard.write_index_dashboard(project, [], [], [])
+        path = dashboard.write_index_dashboard(project, [], [])
         assert path.exists()
         content = path.read_text()
         assert "<!DOCTYPE html>" in content
@@ -556,9 +556,9 @@ class TestWriteDashboards:
             {"id": 1, "timestamp": "t1", "breakpoint_id": 1,
              "git_summary": "v2", "prompt_count": 0, "loops": []}]
         path1 = dashboard.write_index_dashboard(
-            project, [], reflections_v1, [])
+            project, reflections_v1, [])
         path2 = dashboard.write_index_dashboard(
-            project, [], reflections_v2, [])
+            project, reflections_v2, [])
         content2 = path2.read_text()
         assert path1 == path2
         assert "v2" in content2

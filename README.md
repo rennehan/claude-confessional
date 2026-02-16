@@ -29,7 +29,7 @@ Restart Claude Code after installing.
 ```bash
 mkdir -p ~/.claude/commands ~/.claude/scripts
 
-cp record.md breakpoint.md reflect.md ~/.claude/commands/
+cp record.md reflect.md ~/.claude/commands/
 cp confess.md amen.md sermon.md ~/.claude/commands/
 cp confessional_store.py transcript_reader.py confessional_hook.py dashboard_generator.py ~/.claude/scripts/
 chmod +x ~/.claude/scripts/confessional_store.py ~/.claude/scripts/transcript_reader.py ~/.claude/scripts/confessional_hook.py ~/.claude/scripts/dashboard_generator.py
@@ -48,23 +48,11 @@ Enable recording for the current project. Recording is **per-project** — you e
 
 Once enabled for a project, recording persists across sessions — it stays on until you explicitly disable it. You only need to run `/record` once per project.
 
-### `/breakpoint` — Mark a Session Boundary
-
-Mark the end of a work session. Optionally attach a note:
-
-```
-/breakpoint Finished the auth refactor.
-```
-
-Breakpoints are also **created automatically** — a system hook fires on every SessionStart and inserts a breakpoint if your last session in that project was more than 4 hours ago. So if you forget to `/breakpoint` at the end of a session, the next session will pick up the boundary for you. Note: sessions less than 4 hours apart do **not** trigger an auto-breakpoint — use `/breakpoint` manually if you want a boundary between closely-spaced sessions.
-
 ### `/reflect` — Analyze Your Methodology
 
 Claude reads every prompt, response, tool call, and git commit since the last breakpoint from the native transcripts and delivers a reflection. Not a summary. A *diagnosis*. Your loop, your patterns, your cognitive fingerprint. What you say when you're confused. What you say when you're excited. How you think.
 
-If you have enough breakpoint history (3+), you'll be prompted to choose how far back to reflect — just the last session, or a wider arc spanning multiple sessions. This lets you zoom out and see how your methodology evolves over a longer stretch of work.
-
-After the reflection is complete, `/reflect` automatically creates a new breakpoint so your next session starts fresh. You never need to manually `/breakpoint` after reflecting.
+After the reflection is complete, `/reflect` automatically creates a new breakpoint so your next session starts fresh.
 
 The reflection includes token economics — cache hit rates, cost-per-insight, most expensive turns — so you can see not just *how* you work, but how *efficiently*.
 
@@ -77,10 +65,9 @@ Reflections accumulate. Over time, Claude can trace the evolution of your method
 ```
 /record          <- enable recording (once per project, not global)
   ... work ...
-/breakpoint      <- mark a boundary
-/reflect         <- analyze your methodology
-  ... work ...   <- recording continues automatically
-/breakpoint      <- mark another boundary
+/reflect         <- analyze your methodology (auto-creates a breakpoint)
+  ... work ...
+/reflect         <- reflect again — each one builds on the last
 ```
 
 ## How It Works
@@ -89,7 +76,7 @@ Reflections accumulate. Over time, Claude can trace the evolution of your method
 
 confessional only stores what's *unique*:
 
-- **Breakpoints** — session boundaries you define (`~/.reflection/projects/<project>/breakpoints.jsonl`)
+- **Breakpoints** — session boundaries, managed automatically (`~/.reflection/projects/<project>/breakpoints.jsonl`)
 - **Reflections** — methodology analyses (`~/.reflection/projects/<project>/reflections.jsonl`)
 - **Recording state** — which projects are active, tracked per-project (`~/.reflection/config.json`)
 
@@ -97,17 +84,17 @@ Everything is plain text. No SQL. No database. Just JSON and JSONL files you can
 
 ### Transcript Retention
 
-Because confessional reads from Claude Code's native transcripts on-demand, those transcripts need to still exist when you `/reflect`. Claude Code automatically cleans up local transcripts after a configurable period (around 30 days by default). If you wait too long between a `/breakpoint` and `/reflect`, the transcript data for that session may already be gone.
+Because confessional reads from Claude Code's native transcripts on-demand, those transcripts need to still exist when you `/reflect`. Claude Code automatically cleans up local transcripts after a configurable period (around 30 days by default). If you wait too long between reflections, the transcript data for that session may already be gone.
 
 Your confessional data in `~/.reflection/` (breakpoints, reflections, dashboards) is **never auto-cleaned** — once you generate a reflection, it's yours permanently. But you can only generate a reflection while the source transcripts still exist.
 
-**Recommendation:** Run `/reflect` reasonably soon after a breakpoint. Don't let weeks pass. If you want a longer window, increase `cleanupPeriodDays` in your Claude Code settings (`~/.claude/settings.json`) to retain transcripts for longer.
+**Recommendation:** Run `/reflect` regularly. Don't let weeks pass. If you want a longer window, increase `cleanupPeriodDays` in your Claude Code settings (`~/.claude/settings.json`) to retain transcripts for longer.
 
 ### Architecture
 
 | Module | Purpose |
 |--------|---------|
-| `confessional_store.py` | Breakpoints, reflections, recording state, dashboard manifest (JSON/JSONL I/O) |
+| `confessional_store.py` | Reflections, breakpoints, recording state, dashboard manifest (JSON/JSONL I/O) |
 | `transcript_reader.py` | Reads native JSONL transcripts, extracts turns/tools/metrics, computes prompt linguistics and effectiveness signals |
 | `confessional_hook.py` | SessionStart hook only (auto-breakpoints when sessions are >4h apart) |
 | `dashboard_generator.py` | Pure-CSS HTML dashboards: per-session visualizations and master index |
@@ -118,7 +105,7 @@ A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no t
 
 | File | Contents |
 |------|----------|
-| `breakpoints.jsonl` | Session boundaries with timestamps and notes |
+| `breakpoints.jsonl` | Session boundaries with timestamps and notes (auto-managed) |
 | `reflections.jsonl` | Methodology analyses produced by `/reflect` |
 | `config.json` | Per-project recording toggle |
 | `dashboards/index.html` | Master dashboard listing all breakpoints and reflection status |
@@ -161,24 +148,22 @@ Each reflection includes a quantitative linguistic analysis of your prompts:
 
 ## The Liturgical Edition (Optional)
 
-If you've fully converted to the Church of Claude, you can install the meme aliases alongside the standard commands:
+If you've fully converted to the Church of Claude, pass `--pious` to the installer:
 
 ```bash
-cp confess.md ~/.claude/commands/
-cp amen.md ~/.claude/commands/
-cp sermon.md ~/.claude/commands/
+./install.sh --pious
 ```
 
-Then your ritual becomes:
+This installs the liturgical aliases alongside the standard commands:
 
 ```
-/confess         <- kneel and begin
+/confess         <- kneel and begin (/record)
   ... work ...
-/amen            <- close the prayer
-/sermon          <- receive the word
+/amen            <- close the prayer (session breakpoint)
+/sermon          <- receive the word (/reflect)
 ```
 
-Same functionality, more piety. Both sets can coexist — use whichever matches your current level of devotion.
+Same functionality, more piety. Both sets coexist — use whichever matches your current level of devotion.
 
 ## Managing Recording
 

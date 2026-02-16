@@ -5,6 +5,13 @@ set -euo pipefail
 # Copies commands and scripts into ~/.claude/, registers hooks.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PIOUS=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --pious) PIOUS=true ;;
+    esac
+done
 
 echo "Installing Claude Confessional..."
 
@@ -13,13 +20,15 @@ mkdir -p ~/.claude/commands ~/.claude/scripts
 
 # Core commands
 cp "$SCRIPT_DIR/record.md"      ~/.claude/commands/
-cp "$SCRIPT_DIR/breakpoint.md"  ~/.claude/commands/
 cp "$SCRIPT_DIR/reflect.md"     ~/.claude/commands/
 
-# Liturgical aliases
-cp "$SCRIPT_DIR/confess.md"     ~/.claude/commands/
-cp "$SCRIPT_DIR/amen.md"        ~/.claude/commands/
-cp "$SCRIPT_DIR/sermon.md"      ~/.claude/commands/
+# Liturgical aliases (optional)
+if [ "$PIOUS" = true ]; then
+    cp "$SCRIPT_DIR/confess.md"     ~/.claude/commands/
+    cp "$SCRIPT_DIR/amen.md"        ~/.claude/commands/
+    cp "$SCRIPT_DIR/sermon.md"      ~/.claude/commands/
+    echo "Liturgical commands installed: /confess, /amen, /sermon"
+fi
 
 # Scripts
 cp "$SCRIPT_DIR/confessional_store.py"  ~/.claude/scripts/

@@ -263,6 +263,28 @@ class TestReflections:
     def test_get_all_loops_empty(self, project):
         assert store.get_all_loops(project) == []
 
+    def test_multiple_reflections_always_append(self, project):
+        """Each store_reflection must add a NEW entry — never overwrite prior ones."""
+        store.add_breakpoint(project, "bp")
+        texts = [f"Reflection number {i} with full content" for i in range(1, 6)]
+        for text in texts:
+            store.store_reflection(project, text, "commits", 10)
+        refs = store.get_reflections(project)
+        assert len(refs) == 5
+        for i, ref in enumerate(refs):
+            assert ref["id"] == i + 1
+            assert ref["reflection"] == texts[i]
+
+    def test_full_reflection_text_preserved(self, project):
+        """Long reflection text must be stored in its entirety, not truncated."""
+        store.add_breakpoint(project, "bp")
+        long_text = "## Section\n\n" + ("Deep analysis. " * 500) + "\n\n## Evolution\n\nPatterns shifted."
+        ref = store.store_reflection(project, long_text, "10 commits", 50)
+        assert ref["reflection"] == long_text
+        # Verify round-trip through JSONL
+        refs = store.get_reflections(project)
+        assert refs[0]["reflection"] == long_text
+
     def test_get_all_loops_backward_compat(self, project):
         """Old reflections without loops field should not break get_all_loops."""
         store.add_breakpoint(project, "bp")
