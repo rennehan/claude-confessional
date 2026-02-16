@@ -33,11 +33,11 @@ THEMES = {
         "success": "#6bab6b", "warning": "#e0a848", "border": "#333333",
     },
     "church of claude": {
-        "bg": "#140a18", "surface": "#1e1024", "card": "#2a1430",
-        "text": "#e8d8f0", "text-muted": "#9a80a8", "accent": "#cfb53b",
+        "bg": "#faf8f5", "surface": "#f0ebe3", "card": "#e8e0d4",
+        "text": "#2a1a2e", "text-muted": "#6b5070", "accent": "#cfb53b",
         "bar-1": "#722f6b", "bar-2": "#cfb53b", "bar-3": "#8b2242",
-        "bar-4": "#2e5090", "bar-5": "#c8a882",
-        "success": "#cfb53b", "warning": "#8b2242", "border": "#3a1e44",
+        "bar-4": "#2e5090", "bar-5": "#1e8c5f",
+        "success": "#1e8c5f", "warning": "#8b2242", "border": "#d4c8b8",
     },
     "midnight": {
         "bg": "#1a1a2e", "surface": "#16213e", "card": "#0f3460",
