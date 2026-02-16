@@ -153,19 +153,67 @@ def store_reflection(project, reflection_text, git_summary="", prompt_count=0,
     return entry
 
 
+def _normalize_loop(entry):
+    """Normalize a loop entry to {loop, task_type} dict.
+
+    Accepts either a plain string or a dict with 'loop' and optional 'task_type'.
+    """
+    if isinstance(entry, str):
+        return {"loop": entry, "task_type": "unknown"}
+    if isinstance(entry, dict):
+        return {
+            "loop": entry.get("loop", str(entry)),
+            "task_type": entry.get("task_type", "unknown"),
+        }
+    return {"loop": str(entry), "task_type": "unknown"}
+
+
 def get_all_loops(project):
     """Get all methodology loops across reflections, with metadata."""
     reflections = get_reflections(project)
     loops = []
     for ref in reflections:
-        for loop_text in ref.get("loops", []):
+        for raw in ref.get("loops", []):
+            norm = _normalize_loop(raw)
             loops.append({
-                "loop": loop_text,
+                "loop": norm["loop"],
+                "task_type": norm["task_type"],
                 "reflection_id": ref["id"],
                 "timestamp": ref["timestamp"],
                 "breakpoint_id": ref.get("breakpoint_id"),
             })
     return loops
+
+
+def get_step_frequencies(project):
+    """Parse all loops into individual steps and count occurrences.
+
+    Returns list of {"step": str, "count": int} sorted by count descending.
+    """
+    from collections import Counter
+    loops = get_all_loops(project)
+    counter = Counter()
+    for entry in loops:
+        steps = [s.strip() for s in entry["loop"].split("→")]
+        for step in steps:
+            if step:
+                counter[step] += 1
+    return [{"step": step, "count": count}
+            for step, count in counter.most_common()]
+
+
+def get_core_loop(project):
+    """Find the most common full loop string across all reflections.
+
+    Returns {"loop": str, "count": int, "total": int} or None if no loops.
+    """
+    from collections import Counter
+    loops = get_all_loops(project)
+    if not loops:
+        return None
+    counter = Counter(entry["loop"] for entry in loops)
+    most_common_loop, count = counter.most_common(1)[0]
+    return {"loop": most_common_loop, "count": count, "total": len(loops)}
 
 
 def get_reflections(project):
@@ -346,6 +394,17 @@ def main():
     elif command == "get_all_loops":
         loops = get_all_loops(project)
         print(json.dumps(loops, indent=2))
+
+    elif command == "step_frequencies":
+        freqs = get_step_frequencies(project)
+        print(json.dumps(freqs, indent=2))
+
+    elif command == "core_loop":
+        result = get_core_loop(project)
+        if result:
+            print(json.dumps(result))
+        else:
+            print(json.dumps({"error": "No loops found."}))
 
     elif command == "get_dashboard_manifest":
         manifest = get_dashboard_manifest(project)

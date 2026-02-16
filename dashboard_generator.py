@@ -106,6 +106,14 @@ THEMES = {
 
 DEFAULT_THEME = "claude code"
 
+TASK_TYPE_COLORS = {
+    "design": "var(--bar-1)", "implementation": "var(--bar-2)",
+    "debugging": "var(--bar-3)", "qa/testing": "var(--bar-4)",
+    "refactoring": "var(--bar-5)", "research": "var(--accent)",
+    "documentation": "var(--text-muted)", "devops": "var(--warning)",
+    "unknown": "var(--text-muted)",
+}
+
 
 def _theme_css_vars(theme_name=None):
     """Generate :root CSS variables for a theme."""
@@ -375,6 +383,34 @@ a:hover { text-decoration: underline; }
 .reflection-text li { margin-bottom: 0.25rem; }
 .reflection-text strong { color: var(--accent); }
 .reflection-text code { background: var(--card); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.8rem; }
+
+/* Task-type badges */
+.task-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    margin-top: 0.25rem;
+}
+
+/* Core loop display */
+.core-loop {
+    background: var(--card);
+    border-left: 3px solid var(--accent);
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+}
+.core-loop-text {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--accent);
+}
+.core-loop-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+}
 """ + THEME_SELECTOR_CSS
 
 
@@ -534,6 +570,127 @@ def _inline_markdown(text):
     return result
 
 
+# --- Loop analytics helpers ---
+
+def _normalize_loop(entry):
+    """Normalize a loop entry to {loop, task_type} dict."""
+    if isinstance(entry, str):
+        return {"loop": entry, "task_type": "unknown"}
+    if isinstance(entry, dict):
+        return {
+            "loop": entry.get("loop", str(entry)),
+            "task_type": entry.get("task_type", "unknown"),
+        }
+    return {"loop": str(entry), "task_type": "unknown"}
+
+
+def _task_type_badge_html(task_type):
+    """Render a small colored pill for a task type."""
+    color = TASK_TYPE_COLORS.get(task_type.lower(), "var(--text-muted)")
+    return (
+        f'<span class="task-badge" '
+        f'style="background: {color}; color: var(--bg);">'
+        f'{html.escape(task_type.title())}'
+        f'</span>'
+    )
+
+
+def _step_frequency_chart(loops):
+    """Parse loops into individual steps and render a bar chart.
+
+    Args:
+        loops: list of raw loop entries (strings or dicts)
+    """
+    from collections import Counter
+    counter = Counter()
+    for raw in loops:
+        norm = _normalize_loop(raw)
+        steps = [s.strip() for s in norm["loop"].split("→")]
+        for step in steps:
+            if step:
+                counter[step] += 1
+    if not counter:
+        return '<div class="bar-chart"><span class="no-data">No loops recorded</span></div>'
+    items = counter.most_common()
+    return _bar_chart_html(items)
+
+
+def _core_loop_html(loops):
+    """Compute and render the core (most common) loop display.
+
+    Args:
+        loops: list of loop entry dicts with 'loop' key (from get_all_loops or similar)
+    """
+    from collections import Counter
+    if not loops:
+        return '<div class="subtitle">No loops recorded yet</div>'
+    loop_texts = []
+    for entry in loops:
+        norm = _normalize_loop(entry)
+        loop_texts.append(norm["loop"])
+    counter = Counter(loop_texts)
+    total = len(loop_texts)
+    top = counter.most_common(3)
+
+    parts = []
+    for loop_text, count in top:
+        pct = round(count / total * 100)
+        parts.append(
+            f'<div class="core-loop">'
+            f'<div class="core-loop-text">{html.escape(loop_text)}</div>'
+            f'<div class="core-loop-meta">'
+            f'Appeared {count} of {total} time{"s" if total != 1 else ""} ({pct}%)'
+            f'</div>'
+            f'</div>'
+        )
+    return "\n".join(parts)
+
+
+def _loop_evolution_html(loops, dashboard_paths=None):
+    """Render a timeline table of loops ordered by timestamp.
+
+    Args:
+        loops: list of loop entry dicts with loop, task_type, reflection_id, timestamp
+        dashboard_paths: dict mapping reflection_id -> html_path
+    """
+    if not loops:
+        return '<div class="subtitle">No loops recorded yet</div>'
+    if dashboard_paths is None:
+        dashboard_paths = {}
+
+    rows = []
+    for entry in loops:
+        norm = _normalize_loop(entry)
+        ts = entry.get("timestamp", "")
+        date = ts[:10] if len(ts) >= 10 else ts
+        ref_id = entry.get("reflection_id", "?")
+        task_type = norm["task_type"]
+        badge = _task_type_badge_html(task_type)
+
+        html_path = dashboard_paths.get(ref_id)
+        if html_path:
+            ref_link = f'<a href="{html.escape(html_path)}">#{ref_id}</a>'
+        else:
+            ref_link = f'#{ref_id}'
+
+        rows.append(
+            f'<tr>'
+            f'<td>{html.escape(date)}</td>'
+            f'<td>{ref_link}</td>'
+            f'<td>{badge}</td>'
+            f'<td>{html.escape(norm["loop"])}</td>'
+            f'</tr>'
+        )
+
+    return (
+        '<table><thead><tr>'
+        '<th>Date</th><th>Reflection</th><th>Task Type</th><th>Loop</th>'
+        '</tr></thead><tbody>'
+        + "\n".join(rows)
+        + '</tbody></table>'
+    )
+
+
 # --- Reflection dashboard ---
 
 def generate_reflection_html(analysis_data, reflection, project):
@@ -584,15 +741,22 @@ def generate_reflection_html(analysis_data, reflection, project):
     loops = reflection.get("loops", [])
     if loops:
         loop_items = []
-        for loop_text in loops:
+        for raw in loops:
+            norm = _normalize_loop(raw)
+            badge = _task_type_badge_html(norm["task_type"])
             loop_items.append(
                 f'<div class="card">'
-                f'<div class="loop-value">{html.escape(loop_text)}</div>'
+                f'<div class="loop-value">{html.escape(norm["loop"])}</div>'
+                f'{badge}'
                 f'</div>'
             )
         parts.append(_section_html(
             "Methodology Loops",
             f'<div class="grid">{"".join(loop_items)}</div>'))
+
+        # Step Frequency for this reflection
+        parts.append(_section_html(
+            "Step Frequency", _step_frequency_chart(loops)))
 
     # Summary cards
     cards = [
@@ -799,26 +963,42 @@ def generate_index_html(reflections, manifest, project, loops=None):
     if loops:
         loop_items = []
         for entry in loops:
+            norm = _normalize_loop(entry)
             ts = entry.get("timestamp", "")
             date = ts[:10] if len(ts) >= 10 else ts
             ref_id = entry.get("reflection_id", "?")
+            badge = _task_type_badge_html(norm["task_type"])
             html_path = dashboard_paths.get(ref_id)
             if html_path:
                 loop_items.append(
                     f'<a class="loop-card" href="{html.escape(html_path)}">'
-                    f'<div class="loop-value">{html.escape(entry["loop"])}</div>'
+                    f'<div class="loop-value">{html.escape(norm["loop"])}</div>'
+                    f'{badge}'
                     f'<div class="loop-label">Reflection #{ref_id} &mdash; {html.escape(date)}</div>'
                     f'</a>'
                 )
             else:
                 loop_items.append(
                     f'<div class="loop-card">'
-                    f'<div class="loop-value">{html.escape(entry["loop"])}</div>'
+                    f'<div class="loop-value">{html.escape(norm["loop"])}</div>'
+                    f'{badge}'
                     f'<div class="loop-label">Reflection #{ref_id} &mdash; {html.escape(date)}</div>'
                     f'</div>'
                 )
         loops_html = f'<div class="grid">{"".join(loop_items)}</div>'
         parts.append(_section_html("Methodology Loops", loops_html))
+
+        # Core Loop
+        parts.append(_section_html("Core Loop", _core_loop_html(loops)))
+
+        # Step Frequency Fingerprint
+        all_raw_loops = [entry for entry in loops]
+        parts.append(_section_html(
+            "Step Frequency Fingerprint", _step_frequency_chart(all_raw_loops)))
+
+        # Loop Evolution
+        parts.append(_section_html(
+            "Loop Evolution", _loop_evolution_html(loops, dashboard_paths)))
 
     # Reflections table
     rows = []

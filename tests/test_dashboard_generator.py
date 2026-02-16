@@ -404,6 +404,27 @@ class TestGenerateReflectionHtml:
             analysis_data, ref, "test-project")
         assert "Methodology Loops" not in html
 
+    def test_step_frequency_section(self, analysis_data):
+        ref = _make_reflection(loops=["A → B → C", "B → C → D"])
+        html = dashboard.generate_reflection_html(
+            analysis_data, ref, "test-project")
+        assert "Step Frequency" in html
+
+    def test_task_type_badge_on_loop_cards(self, analysis_data):
+        ref = _make_reflection(
+            loops=[{"loop": "A → B", "task_type": "Design"}])
+        html = dashboard.generate_reflection_html(
+            analysis_data, ref, "test-project")
+        assert "task-badge" in html
+        assert "Design" in html
+
+    def test_old_string_loops_still_render(self, analysis_data):
+        ref = _make_reflection(loops=["X → Y → Z"])
+        html = dashboard.generate_reflection_html(
+            analysis_data, ref, "test-project")
+        assert "X → Y → Z" in html or "X →" in html
+        assert "task-badge" in html  # unknown badge still appears
+
 
 # --- Tests: Backward compatibility (old session API) ---
 
@@ -522,6 +543,54 @@ class TestGenerateIndexHtml:
         ]
         html = dashboard.generate_index_html(reflections, [], "test-project")
         assert "3 loops" in html
+
+    def test_core_loop_section(self):
+        loops = [
+            {"loop": "A → B → C", "task_type": "Design",
+             "reflection_id": 1, "timestamp": "2025-02-13T16:05:00+00:00"},
+            {"loop": "A → B → C", "task_type": "Design",
+             "reflection_id": 2, "timestamp": "2025-02-14T16:05:00+00:00"},
+            {"loop": "D → E", "task_type": "QA/Testing",
+             "reflection_id": 3, "timestamp": "2025-02-15T16:05:00+00:00"},
+        ]
+        html = dashboard.generate_index_html([], [], "test-project", loops=loops)
+        assert "Core Loop" in html
+        assert "core-loop" in html
+
+    def test_step_frequency_fingerprint(self):
+        loops = [
+            {"loop": "A → B → C", "task_type": "Design",
+             "reflection_id": 1, "timestamp": "2025-02-13T16:05:00+00:00"},
+        ]
+        html = dashboard.generate_index_html([], [], "test-project", loops=loops)
+        assert "Step Frequency Fingerprint" in html
+
+    def test_loop_evolution_section(self):
+        loops = [
+            {"loop": "A → B", "task_type": "Design",
+             "reflection_id": 1, "timestamp": "2025-02-13T16:05:00+00:00"},
+            {"loop": "C → D", "task_type": "Implementation",
+             "reflection_id": 2, "timestamp": "2025-02-14T16:05:00+00:00"},
+        ]
+        html = dashboard.generate_index_html([], [], "test-project", loops=loops)
+        assert "Loop Evolution" in html
+        assert "Design" in html
+        assert "Implementation" in html
+
+    def test_task_type_badges_on_index_loop_cards(self):
+        loops = [
+            {"loop": "A → B", "task_type": "Debugging",
+             "reflection_id": 1, "timestamp": "2025-02-13T16:05:00+00:00"},
+        ]
+        html = dashboard.generate_index_html([], [], "test-project", loops=loops)
+        assert "task-badge" in html
+        assert "Debugging" in html
+
+    def test_no_analytics_without_loops(self):
+        html = dashboard.generate_index_html([], [], "test-project", loops=[])
+        assert "Core Loop" not in html
+        assert "Step Frequency" not in html
+        assert "Loop Evolution" not in html
 
 
 # --- Tests: Theme system ---

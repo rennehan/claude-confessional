@@ -297,6 +297,51 @@ class TestReflections:
         # Should return empty, not crash
         assert store.get_all_loops(project) == []
 
+    def test_get_all_loops_mixed_formats(self, project):
+        """get_all_loops should handle both string and object loop formats."""
+        store.add_breakpoint(project, "bp")
+        # Old format: plain strings
+        store.store_reflection(project, "R1", loops=["A → B → C"])
+        # New format: objects with task_type
+        store.store_reflection(
+            project, "R2",
+            loops=[{"loop": "D → E", "task_type": "Design"}])
+        loops = store.get_all_loops(project)
+        assert len(loops) == 2
+        assert loops[0]["loop"] == "A → B → C"
+        assert loops[0]["task_type"] == "unknown"
+        assert loops[1]["loop"] == "D → E"
+        assert loops[1]["task_type"] == "Design"
+
+    def test_get_step_frequencies(self, project):
+        store.add_breakpoint(project, "bp")
+        store.store_reflection(project, "R1", loops=["A → B → C"])
+        store.store_reflection(project, "R2", loops=["B → C → D", "A → B"])
+        freqs = store.get_step_frequencies(project)
+        freq_dict = {f["step"]: f["count"] for f in freqs}
+        assert freq_dict["B"] == 3  # appears in all 3 loops
+        assert freq_dict["A"] == 2
+        assert freq_dict["C"] == 2
+        assert freq_dict["D"] == 1
+        # Sorted descending
+        assert freqs[0]["count"] >= freqs[-1]["count"]
+
+    def test_get_step_frequencies_empty(self, project):
+        assert store.get_step_frequencies(project) == []
+
+    def test_get_core_loop(self, project):
+        store.add_breakpoint(project, "bp")
+        store.store_reflection(project, "R1", loops=["A → B → C"])
+        store.store_reflection(project, "R2", loops=["A → B → C", "D → E"])
+        store.store_reflection(project, "R3", loops=["A → B → C"])
+        result = store.get_core_loop(project)
+        assert result["loop"] == "A → B → C"
+        assert result["count"] == 3
+        assert result["total"] == 4
+
+    def test_get_core_loop_empty(self, project):
+        assert store.get_core_loop(project) is None
+
 
 # --- Tests: Dashboard Manifest ---
 

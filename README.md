@@ -109,7 +109,7 @@ A single hook fires on SessionStart — no per-turn overhead, no Stop hook, no t
 | `reflections.jsonl` | Methodology analyses produced by `/reflect` |
 | `config.json` | Per-project recording toggle |
 | `dashboards/index.html` | Master dashboard listing all breakpoints and reflection status |
-| `dashboards/session-N.html` | Per-session HTML dashboard with charts and metrics |
+| `dashboards/reflection-N.html` | Per-reflection HTML dashboard with charts, loop analytics, and metrics |
 | `dashboards/manifest.jsonl` | Tracks which dashboards have been generated |
 
 Everything lives in `~/.reflection/` as plain JSON/JSONL/HTML. Human-readable, LLM-loadable, and portable.
@@ -135,6 +135,15 @@ It doesn't summarize your conversation. Any chatbot can do that. It extracts you
 - **Your tool patterns** — Heavy on file reads = exploring. Heavy on writes = building. Heavy on bash = debugging. The tools tell the truth.
 - **Your token economics** — Cache hit rate, cost per turn, output verbosity. Are you being efficient?
 - **Your evolution** — How your methodology changes across sessions, across weeks, across projects.
+
+### Loop Analytics
+
+The methodology loops extracted from each reflection are now the analytical focal point:
+
+- **Step Frequency Fingerprint** — Individual steps (e.g., "Design", "Test", "Ship") are parsed from arrow-chain loops and counted across all reflections. The resulting bar chart is your project's methodology fingerprint — which steps dominate your workflow.
+- **Task-Type Classification** — Each loop is tagged with a task type (Design, Implementation, Debugging, QA/Testing, Refactoring, Research, Documentation, DevOps). See which work modes produce which patterns.
+- **Core Loop** — The most common full loop across all reflections, with frequency. As reflections accumulate, your canonical workflow emerges.
+- **Loop Evolution** — A timeline of every loop, ordered by date, showing when different patterns appeared and what task type they belonged to.
 
 ### Voice Analysis
 

@@ -53,6 +53,8 @@ Study the prompts and responses together. Extract:
 - Design → implement → test → reflect? Or some other pattern?
 - How many rounds of discussion before committing to action?
 
+For each methodology loop identified, also classify the **task type** it relates to. Common types: **Design**, **Implementation**, **Debugging**, **QA/Testing**, **Refactoring**, **Research**, **Documentation**, **DevOps**. Use the one that best fits the work the loop describes.
+
 **Prompting Style** — How does the user communicate intent?
 - Common phrases and what they signal (e.g., "let's think more" = not ready to commit, "this is fine" = move on, "what about X?" = exploring alternatives)
 - Level of specificity — do they give detailed specs or high-level direction?
@@ -141,11 +143,11 @@ If the previous reflections summary (fetched in Step 1) contains any prior refle
 
 ### 4. Store and Present
 
-Extract the methodology loops from the reflection as short arrow-chain descriptions (e.g., `"Experience → Question → Direct → Ship"`). Include as many loops as were identified in the reflection.
+Extract the methodology loops from the reflection as short arrow-chain descriptions (e.g., `"Experience → Question → Direct → Ship"`). For each loop, include the task type you classified in Step 2. Include as many loops as were identified in the reflection.
 
-Store the **complete** reflection (including all sections produced in Step 3) using `--stdin` with a heredoc to safely pass the reflection text. Pass the loops as a JSON array via `--loops`:
+Store the **complete** reflection (including all sections produced in Step 3) using `--stdin` with a heredoc to safely pass the reflection text. Pass the loops as a JSON array of objects via `--loops`, each with `loop` and `task_type` keys:
 ```bash
-python3 ~/.claude/scripts/confessional_store.py store_reflection "$PROJECT" "<git_summary>" <prompt_count> --stdin --loops '["Loop 1 → Step 2 → Step 3", "Another → Pattern"]' <<'CONFESSIONAL_EOF'
+python3 ~/.claude/scripts/confessional_store.py store_reflection "$PROJECT" "<git_summary>" <prompt_count> --stdin --loops '[{"loop": "Design → Implement → Test", "task_type": "Implementation"}, {"loop": "Question → Research → Decide", "task_type": "Design"}]' <<'CONFESSIONAL_EOF'
 <reflection_text>
 CONFESSIONAL_EOF
 ```
