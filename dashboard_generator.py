@@ -24,23 +24,152 @@ import confessional_store as store
 
 # --- CSS ---
 
-CSS_STYLES = """
-:root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --card: #0f3460;
-    --text: #e0e0e0;
-    --text-muted: #8b8b8b;
-    --accent: #e94560;
-    --bar-1: #533483;
-    --bar-2: #e94560;
-    --bar-3: #2ecc71;
-    --bar-4: #f39c12;
-    --bar-5: #3498db;
-    --success: #2ecc71;
-    --warning: #f39c12;
-    --border: #2a2a4a;
+THEMES = {
+    "midnight": {
+        "bg": "#1a1a2e", "surface": "#16213e", "card": "#0f3460",
+        "text": "#e0e0e0", "text-muted": "#8b8b8b", "accent": "#e94560",
+        "bar-1": "#533483", "bar-2": "#e94560", "bar-3": "#2ecc71",
+        "bar-4": "#f39c12", "bar-5": "#3498db",
+        "success": "#2ecc71", "warning": "#f39c12", "border": "#2a2a4a",
+    },
+    "vespers": {
+        "bg": "#1a1511", "surface": "#241c14", "card": "#2e2318",
+        "text": "#e8dcc8", "text-muted": "#9a8b73", "accent": "#d4a254",
+        "bar-1": "#b87333", "bar-2": "#c0755a", "bar-3": "#8fad7e",
+        "bar-4": "#c07050", "bar-5": "#7a8b99",
+        "success": "#8fad7e", "warning": "#d4a254", "border": "#3a2e20",
+    },
+    "cathedra": {
+        "bg": "#1c1c1c", "surface": "#252525", "card": "#2e2e2e",
+        "text": "#e0ddd5", "text-muted": "#8a8780", "accent": "#c0392b",
+        "bar-1": "#2c3e6e", "bar-2": "#c0392b", "bar-3": "#d4a017",
+        "bar-4": "#1e8c5f", "bar-5": "#7b4e9e",
+        "success": "#1e8c5f", "warning": "#d4a017", "border": "#3a3a3a",
+    },
+    "cloister": {
+        "bg": "#0d1b0e", "surface": "#142016", "card": "#1a2b1c",
+        "text": "#c8d8c0", "text-muted": "#6e8a65", "accent": "#7dcea0",
+        "bar-1": "#2d6a3f", "bar-2": "#7dcea0", "bar-3": "#8aad6e",
+        "bar-4": "#5a8a50", "bar-5": "#4a9a8a",
+        "success": "#7dcea0", "warning": "#a8c060", "border": "#243826",
+    },
+    "parchment": {
+        "bg": "#f5f0e8", "surface": "#ebe4d8", "card": "#e0d8c8",
+        "text": "#2c2416", "text-muted": "#6b5d4e", "accent": "#8b4513",
+        "bar-1": "#a0522d", "bar-2": "#722f37", "bar-3": "#2c3e50",
+        "bar-4": "#556b2f", "bar-5": "#5f6b7a",
+        "success": "#556b2f", "warning": "#a0522d", "border": "#c8bfaf",
+    },
+    "terminal": {
+        "bg": "#0a0a0a", "surface": "#111111", "card": "#1a1a1a",
+        "text": "#cccccc", "text-muted": "#666666", "accent": "#00ff41",
+        "bar-1": "#00ff41", "bar-2": "#00d4aa", "bar-3": "#ffb800",
+        "bar-4": "#88ff00", "bar-5": "#ffffff",
+        "success": "#00ff41", "warning": "#ffb800", "border": "#222222",
+    },
+    "byzantium": {
+        "bg": "#120a1e", "surface": "#1a1028", "card": "#221638",
+        "text": "#e0d8e8", "text-muted": "#8a7a9a", "accent": "#d4af37",
+        "bar-1": "#7b4e9e", "bar-2": "#d4af37", "bar-3": "#c0392b",
+        "bar-4": "#4a9a8a", "bar-5": "#e8dcc0",
+        "success": "#4a9a8a", "warning": "#d4af37", "border": "#2e1e48",
+    },
+    "arctic": {
+        "bg": "#0d1117", "surface": "#161b22", "card": "#1c2333",
+        "text": "#c9d1d9", "text-muted": "#6e7a88", "accent": "#58a6ff",
+        "bar-1": "#58a6ff", "bar-2": "#79c0ff", "bar-3": "#a0aec0",
+        "bar-4": "#7ee8fa", "bar-5": "#b8a9e0",
+        "success": "#3fb950", "warning": "#d29922", "border": "#21262d",
+    },
+    "ember": {
+        "bg": "#1a0a0a", "surface": "#241210", "card": "#2e1815",
+        "text": "#e8d0c8", "text-muted": "#9a7a70", "accent": "#ff6b35",
+        "bar-1": "#ff6b35", "bar-2": "#c0443a", "bar-3": "#e8a030",
+        "bar-4": "#a83232", "bar-5": "#8a7068",
+        "success": "#e8a030", "warning": "#ff6b35", "border": "#3a2020",
+    },
+    "claude code": {
+        "bg": "#1a1a1a", "surface": "#222222", "card": "#2a2a2a",
+        "text": "#d4d4d4", "text-muted": "#737373", "accent": "#e07a3a",
+        "bar-1": "#e07a3a", "bar-2": "#d4a27a", "bar-3": "#6bab6b",
+        "bar-4": "#e0a848", "bar-5": "#7a9ec0",
+        "success": "#6bab6b", "warning": "#e0a848", "border": "#333333",
+    },
 }
+
+DEFAULT_THEME = "midnight"
+
+
+def _theme_css_vars(theme_name=None):
+    """Generate :root CSS variables for a theme."""
+    theme = THEMES.get(theme_name or DEFAULT_THEME, THEMES[DEFAULT_THEME])
+    lines = []
+    for key, value in theme.items():
+        lines.append(f"    --{key}: {value};")
+    return ":root {\n" + "\n".join(lines) + "\n}"
+
+
+THEME_SELECTOR_CSS = """
+/* Theme selector */
+.theme-selector {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 100;
+}
+.theme-selector select {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: auto;
+}
+.theme-selector select:hover {
+    border-color: var(--accent);
+}
+"""
+
+
+def _theme_selector_html():
+    """Generate the theme selector dropdown and script."""
+    options = []
+    for name in THEMES:
+        label = name.title()
+        options.append(f'<option value="{html.escape(name)}">{html.escape(label)}</option>')
+    options_html = "\n".join(options)
+
+    themes_json = json.dumps(THEMES, separators=(",", ":"))
+
+    return f"""<div class="theme-selector">
+<select id="theme-select" aria-label="Color theme">
+{options_html}
+</select>
+</div>
+<script>
+(function() {{
+  var themes = {themes_json};
+  var sel = document.getElementById('theme-select');
+  var saved = localStorage.getItem('confessional-theme');
+  if (saved && themes[saved]) sel.value = saved;
+  function apply(name) {{
+    var t = themes[name];
+    if (!t) return;
+    var r = document.documentElement.style;
+    for (var k in t) r.setProperty('--' + k, t[k]);
+    localStorage.setItem('confessional-theme', name);
+  }}
+  if (saved && themes[saved]) apply(saved);
+  sel.addEventListener('change', function() {{ apply(sel.value); }});
+}})();
+</script>"""
+
+
+CSS_STYLES = """
+""" + _theme_css_vars(DEFAULT_THEME) + """
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -225,7 +354,7 @@ a:hover { text-decoration: underline; }
 .reflection-text li { margin-bottom: 0.25rem; }
 .reflection-text strong { color: var(--accent); }
 .reflection-text code { background: var(--card); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.8rem; }
-"""
+""" + THEME_SELECTOR_CSS
 
 
 # --- HTML helpers ---
@@ -706,6 +835,7 @@ def generate_index_html(reflections, manifest, project, loops=None):
 
 def _wrap_html(title, body):
     """Wrap body content in a full HTML document."""
+    selector = _theme_selector_html()
     return (
         f'<!DOCTYPE html>\n'
         f'<html lang="en">\n'
@@ -716,6 +846,7 @@ def _wrap_html(title, body):
         f'<style>{CSS_STYLES}</style>\n'
         f'</head>\n'
         f'<body>\n'
+        f'{selector}\n'
         f'{body}\n'
         f'</body>\n'
         f'</html>\n'

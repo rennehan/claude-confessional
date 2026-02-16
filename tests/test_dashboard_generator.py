@@ -524,6 +524,44 @@ class TestGenerateIndexHtml:
         assert "3 loops" in html
 
 
+# --- Tests: Theme system ---
+
+class TestThemes:
+
+    def test_all_themes_have_required_vars(self):
+        required = {"bg", "surface", "card", "text", "text-muted", "accent",
+                     "bar-1", "bar-2", "bar-3", "bar-4", "bar-5",
+                     "success", "warning", "border"}
+        for name, theme in dashboard.THEMES.items():
+            assert set(theme.keys()) == required, f"Theme '{name}' has wrong keys"
+
+    def test_default_theme_exists(self):
+        assert dashboard.DEFAULT_THEME in dashboard.THEMES
+
+    def test_theme_selector_in_output(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
+        assert "theme-select" in html
+        assert "localStorage" in html
+
+    def test_all_themes_in_selector(self, analysis_data, reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
+        for name in dashboard.THEMES:
+            assert name in html, f"Theme '{name}' missing from selector"
+
+    def test_theme_selector_in_index(self):
+        html = dashboard.generate_index_html([], [], "test-project")
+        assert "theme-select" in html
+
+    def test_no_external_resources_with_themes(self, analysis_data,
+                                                reflection_data):
+        html = dashboard.generate_reflection_html(
+            analysis_data, reflection_data, "test-project")
+        assert "http://" not in html
+        assert "https://" not in html
+
+
 # --- Tests: File write functions ---
 
 class TestWriteDashboards:
