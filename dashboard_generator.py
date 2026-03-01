@@ -944,7 +944,7 @@ def generate_index_html(reflections, manifest, project, loops=None):
     # Build lookup: reflection_id -> html_path
     dashboard_paths = {}
     for entry in manifest:
-        dashboard_paths[entry.get("reflection_id")] = entry["html_path"]
+        dashboard_paths[entry.get("reflection_id")] = Path(entry["html_path"]).name
 
     ref_count = len(reflections)
     ref_word = "reflection" if ref_count == 1 else "reflections"
