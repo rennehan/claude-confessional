@@ -17,11 +17,17 @@ echo "Installing Claude Confessional..."
 
 # Clean up old commands/ layout (pre-skills migration)
 OLD_CMDS=(record reflect confess amen sermon breakpoint dashboard)
+cleaned=false
 for cmd in "${OLD_CMDS[@]}"; do
-    rm -f ~/.claude/commands/"$cmd".md
+    if [ -f ~/.claude/commands/"$cmd".md ]; then
+        rm -f ~/.claude/commands/"$cmd".md
+        cleaned=true
+    fi
 done
 rmdir ~/.claude/commands/ 2>/dev/null || true
-echo "Cleaned up legacy commands/ files (if any)..."
+if [ "$cleaned" = true ]; then
+    echo "Cleaned up legacy commands/ files."
+fi
 
 # Create directories
 mkdir -p ~/.claude/skills/record ~/.claude/skills/reflect ~/.claude/scripts
