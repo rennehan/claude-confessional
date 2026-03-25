@@ -16,18 +16,19 @@ done
 echo "Installing Claude Confessional..."
 
 # Create directories
-mkdir -p ~/.claude/commands ~/.claude/scripts
+mkdir -p ~/.claude/skills/record ~/.claude/skills/reflect ~/.claude/scripts
 
-# Core commands
-cp "$SCRIPT_DIR/record.md"      ~/.claude/commands/
-cp "$SCRIPT_DIR/reflect.md"     ~/.claude/commands/
+# Core skills
+cp "$SCRIPT_DIR/.claude/skills/record/SKILL.md"   ~/.claude/skills/record/
+cp "$SCRIPT_DIR/.claude/skills/reflect/SKILL.md"   ~/.claude/skills/reflect/
 
 # Liturgical aliases (optional)
 if [ "$PIOUS" = true ]; then
-    cp "$SCRIPT_DIR/confess.md"     ~/.claude/commands/
-    cp "$SCRIPT_DIR/amen.md"        ~/.claude/commands/
-    cp "$SCRIPT_DIR/sermon.md"      ~/.claude/commands/
-    echo "Liturgical commands installed: /confess, /amen, /sermon"
+    mkdir -p ~/.claude/skills/confess ~/.claude/skills/amen ~/.claude/skills/sermon
+    cp "$SCRIPT_DIR/.claude/skills/confess/SKILL.md"   ~/.claude/skills/confess/
+    cp "$SCRIPT_DIR/.claude/skills/amen/SKILL.md"       ~/.claude/skills/amen/
+    cp "$SCRIPT_DIR/.claude/skills/sermon/SKILL.md"     ~/.claude/skills/sermon/
+    echo "Liturgical skills installed: /confess, /amen, /sermon"
 fi
 
 # Scripts

@@ -27,10 +27,17 @@ Restart Claude Code after installing.
 <summary>Manual installation</summary>
 
 ```bash
-mkdir -p ~/.claude/commands ~/.claude/scripts
+mkdir -p ~/.claude/skills/record ~/.claude/skills/reflect ~/.claude/scripts
 
-cp record.md reflect.md ~/.claude/commands/
-cp confess.md amen.md sermon.md ~/.claude/commands/
+cp .claude/skills/record/SKILL.md ~/.claude/skills/record/
+cp .claude/skills/reflect/SKILL.md ~/.claude/skills/reflect/
+
+# Liturgical aliases (optional)
+mkdir -p ~/.claude/skills/confess ~/.claude/skills/amen ~/.claude/skills/sermon
+cp .claude/skills/confess/SKILL.md ~/.claude/skills/confess/
+cp .claude/skills/amen/SKILL.md ~/.claude/skills/amen/
+cp .claude/skills/sermon/SKILL.md ~/.claude/skills/sermon/
+
 cp confessional_store.py transcript_reader.py confessional_hook.py dashboard_generator.py ~/.claude/scripts/
 chmod +x ~/.claude/scripts/confessional_store.py ~/.claude/scripts/transcript_reader.py ~/.claude/scripts/confessional_hook.py ~/.claude/scripts/dashboard_generator.py
 
